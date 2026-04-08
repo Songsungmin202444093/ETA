@@ -7,24 +7,175 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:mobile/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  final savedTabFinder = find.descendant(
+    of: find.byType(NavigationBar),
+    matching: find.byIcon(Icons.bookmark_outline),
+  );
+
+  testWidgets('저장 경로를 불러오면 검색 결과가 바로 보인다', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const MyApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('BusETA'), findsOneWidget);
+    expect(find.text('추천 경로 한눈에'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.tap(savedTabFinder);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, '검색 불러오기').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('추천 결과'), findsOneWidget);
+    expect(find.text('주안역 → 인하대학교'), findsWidgets);
+    expect(find.text('최단 경로'), findsOneWidget);
+  });
+
+  testWidgets('저장 경로는 이름 변경과 삭제가 가능하다', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const MyApp());
+
+    await tester.tap(savedTabFinder);
+    await tester.pumpAndSettle();
+
+    expect(find.text('직접 관리하는 저장 경로'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, '이름/설명 편집').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('저장 경로 편집'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, '경로 이름'), '학교 빠른 루트');
+    await tester.enterText(find.widgetWithText(TextField, '한 줄 설명'), '총 27분, 자주 쓰는 등굣길');
+    await tester.tap(find.widgetWithText(FilledButton, '저장'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('학교 빠른 루트'), findsOneWidget);
+    expect(find.text('총 27분, 자주 쓰는 등굣길'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, '삭제').first);
+    await tester.pumpAndSettle();
+    expect(find.text('저장 경로 삭제'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '삭제'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('학교 빠른 루트'), findsNothing);
+  });
+
+  testWidgets('검색 화면과 저장 탭에서 새 저장 경로를 추가할 수 있다', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const MyApp());
+
+    await tester.tap(find.text('검색'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.widgetWithText(TextField, '출발지'), '우리집');
+    await tester.enterText(find.widgetWithText(TextField, '도착지'), '인하대학교');
+    await tester.scrollUntilVisible(
+      find.widgetWithText(OutlinedButton, '현재 경로 저장'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, '현재 경로 저장'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('현재 경로 저장'), findsWidgets);
+    await tester.enterText(find.widgetWithText(TextField, '저장 이름'), '집에서 학교');
+    await tester.tap(find.widgetWithText(FilledButton, '저장 경로에 추가'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(savedTabFinder);
+    await tester.pumpAndSettle();
+    expect(find.text('집에서 학교'), findsOneWidget);
+
+    await tester.tap(find.text('새 경로 추가').first);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.widgetWithText(TextField, '경로 이름'), '야간 귀가');
+    await tester.enterText(find.widgetWithText(TextField, '출발지'), '인하대학교');
+    await tester.enterText(find.widgetWithText(TextField, '도착지'), '주안역');
+    await tester.enterText(find.widgetWithText(TextField, '한 줄 설명'), '막차 전에 확인할 귀가 루트');
+    await tester.tap(find.widgetWithText(FilledButton, '저장 경로 추가'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('야간 귀가'), findsOneWidget);
+    expect(find.text('막차 전에 확인할 귀가 루트'), findsOneWidget);
+  });
+
+  testWidgets('검색 탭에서 경로 계산과 상세 보기까지 동작한다', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const MyApp());
+
+    await tester.tap(find.text('검색'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('경로 탐색'), findsOneWidget);
+    expect(find.text('출발지와 도착지만 입력하면 총 이동 시간과 환승 위험도를 자동으로 계산합니다.'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '출발지'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '도착지'), findsOneWidget);
+    expect(find.text('최근 검색'), findsOneWidget);
+    expect(find.text('저장 경로 불러오기'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, '출발지'), '우리집');
+    await tester.enterText(find.widgetWithText(TextField, '도착지'), '송도 컨벤시아');
+
+    await tester.scrollUntilVisible(
+      find.text('환승 여유 계산기'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('환승 여유 계산기'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '버스 도착까지'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '역까지 이동'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '지하철 도착까지'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, '버스 도착까지'), '10');
+    await tester.enterText(find.widgetWithText(TextField, '역까지 이동'), '20');
+    await tester.enterText(find.widgetWithText(TextField, '지하철 도착까지'), '32');
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('환승 여유: 2분'), findsOneWidget);
+    expect(find.text('위험'), findsWidgets);
+    expect(find.textContaining('권고: 다음 열차 또는 더 빠른 버스 검토'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(FilledButton, 'ETA 계산하기'),
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'ETA 계산하기'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('최단 경로'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('최단 경로'), findsOneWidget);
+    expect(find.text('우리집 → 송도 컨벤시아'), findsWidgets);
+    expect(find.text('환승 1회'), findsWidgets);
+
+    await tester.tap(find.text('최단 경로'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('환승 판단'), findsOneWidget);
+    expect(find.textContaining('총 소요'), findsOneWidget);
   });
 }
