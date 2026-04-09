@@ -80,6 +80,8 @@ class SavedRoute {
     required this.destination,
     required this.nextDeparture,
     required this.summary,
+    this.isPinned = false,
+    this.tags = const [],
   });
 
   final String id;
@@ -88,6 +90,8 @@ class SavedRoute {
   final String destination;
   final String nextDeparture;
   final String summary;
+  final bool isPinned;
+  final List<String> tags;
 
   SavedRoute copyWith({
     String? name,
@@ -95,6 +99,8 @@ class SavedRoute {
     String? destination,
     String? nextDeparture,
     String? summary,
+    bool? isPinned,
+    List<String>? tags,
   }) {
     return SavedRoute(
       id: id,
@@ -103,6 +109,8 @@ class SavedRoute {
       destination: destination ?? this.destination,
       nextDeparture: nextDeparture ?? this.nextDeparture,
       summary: summary ?? this.summary,
+      isPinned: isPinned ?? this.isPinned,
+      tags: tags ?? this.tags,
     );
   }
 
@@ -113,6 +121,8 @@ class SavedRoute {
         'destination': destination,
         'nextDeparture': nextDeparture,
         'summary': summary,
+        'isPinned': '$isPinned',
+        'tags': tags.join(','),
       };
 
   factory SavedRoute.fromJson(Map<String, dynamic> json) {
@@ -123,6 +133,11 @@ class SavedRoute {
       destination: json['destination'] as String? ?? '',
       nextDeparture: json['nextDeparture'] as String? ?? '',
       summary: json['summary'] as String? ?? '',
+      isPinned: json['isPinned'] == 'true',
+      tags: (json['tags'] as String? ?? '')
+          .split(',')
+          .where((t) => t.isNotEmpty)
+          .toList(),
     );
   }
 }

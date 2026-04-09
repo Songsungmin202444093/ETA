@@ -115,82 +115,145 @@ class HomeScreen extends StatelessWidget {
                 .toList(),
           ),
         ),
+        if (savedRoutes.any((r) => r.isPinned)) ...[
+          const SizedBox(height: 18),
+          SurfaceSection(
+            title: '즐겨찾기',
+            subtitle: '핀 고정한 경로입니다. 저장 탭에서 고정을 관리할 수 있습니다.',
+            child: Column(
+              children: savedRoutes
+                  .where((r) => r.isPinned)
+                  .map((route) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _HomeSavedRouteCard(
+                          route: route,
+                          onOpenRoute: onOpenRoute,
+                          onLoadSearch: onLoadSearch,
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ),
+        ],
         const SizedBox(height: 18),
         SurfaceSection(
           title: '저장된 경로',
           subtitle: '최근 검색과 달리 직접 관리하는 북마크 경로입니다. 이름 변경과 삭제는 저장 탭에서 합니다.',
           child: Column(
-            children: savedRoutes.isEmpty
-                ? const [
-                    _EmptySavedRouteCard(),
-                  ]
-                : List.generate(savedRoutes.length, (index) {
-              final route = savedRoutes[index];
-              final plan = DemoData.routeCandidates(
-                origin: route.origin,
-                destination: route.destination,
-              ).first;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FBFD),
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const CircleAvatar(child: Icon(Icons.bookmark_outline)),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(route.name, style: theme.textTheme.titleMedium),
-                                const SizedBox(height: 2),
-                                Text('${route.origin} → ${route.destination}'),
-                              ],
-                            ),
+            children: savedRoutes.where((r) => !r.isPinned).isEmpty
+                ? const [_EmptySavedRouteCard()]
+                : savedRoutes
+                    .where((r) => !r.isPinned)
+                    .map((route) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _HomeSavedRouteCard(
+                            route: route,
+                            onOpenRoute: onOpenRoute,
+                            onLoadSearch: onLoadSearch,
                           ),
-                          FilledButton.tonal(
-                            onPressed: () => onOpenRoute(plan),
-                            child: const Text('열기'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _InfoChip(label: route.summary),
-                          _InfoChip(label: route.nextDeparture),
-                          _RiskChip(level: plan.riskLevel),
-                          _InfoChip(label: '환승 ${plan.transferCount}회'),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: OutlinedButton.icon(
-                          onPressed: () => onLoadSearch(
-                            SearchPair(origin: route.origin, destination: route.destination),
-                          ),
-                          icon: const Icon(Icons.search_rounded),
-                          label: const Text('검색에 불러오기'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
+                        ))
+                    .toList(),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _HomeSavedRouteCard extends StatelessWidget {
+  const _HomeSavedRouteCard({
+    required this.route,
+    required this.onOpenRoute,
+    required this.onLoadSearch,
+  });
+
+  final SavedRoute route;
+  final ValueChanged<TripPlan> onOpenRoute;
+  final ValueChanged<SearchPair> onLoadSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final plan = DemoData.routeCandidates(
+      origin: route.origin,
+      destination: route.destination,
+    ).first;
+
+    final riskAccent = switch (plan.riskLevel) {
+      '여유' => const Color(0xFF1F8F63),
+      '보통' => const Color(0xFFF28F3B),
+      _ => const Color(0xFFD64545),
+    };
+    final riskBg = switch (plan.riskLevel) {
+      '여유' => const Color(0xFFF5FBF7),
+      '보통' => const Color(0xFFFFF9F2),
+      _ => const Color(0xFFFFF4F4),
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: route.isPinned ? const Color(0xFFF0F8FF) : riskBg,
+        borderRadius: BorderRadius.circular(22),
+        border: route.isPinned
+            ? Border.all(
+                color: const Color(0xFF2C8C99).withValues(alpha: 0.35),
+                width: 1.5)
+            : Border(left: BorderSide(color: riskAccent, width: 4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: route.isPinned ? const Color(0xFF2C8C99) : null,
+                child: Icon(
+                  route.isPinned ? Icons.push_pin_rounded : Icons.bookmark_outline,
+                  color: route.isPinned ? Colors.white : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(route.name, style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 2),
+                    Text('${route.origin} → ${route.destination}'),
+                  ],
+                ),
+              ),
+              FilledButton.tonal(
+                onPressed: () => onOpenRoute(plan),
+                child: const Text('열기'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _InfoChip(label: route.summary),
+              _InfoChip(label: route.nextDeparture),
+              _RiskChip(level: plan.riskLevel),
+              _InfoChip(label: '환승 ${plan.transferCount}회'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: () => onLoadSearch(
+                SearchPair(origin: route.origin, destination: route.destination),
+              ),
+              icon: const Icon(Icons.search_rounded),
+              label: const Text('검색에 불러오기'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -364,8 +427,8 @@ class _RiskChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (level) {
-      '안전' => const Color(0xFF1F8F63),
-      '주의' => const Color(0xFFF28F3B),
+      '여유' => const Color(0xFF1F8F63),
+      '보통' => const Color(0xFFF28F3B),
       _ => const Color(0xFFD64545),
     };
 

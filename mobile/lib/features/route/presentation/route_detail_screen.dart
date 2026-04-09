@@ -14,8 +14,8 @@ class RouteDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final riskColor = switch (plan.riskLevel) {
-      '안전' => const Color(0xFF1F8F63),
-      '주의' => const Color(0xFFF28F3B),
+      '여유' => const Color(0xFF1F8F63),
+      '보통' => const Color(0xFFF28F3B),
       _ => const Color(0xFFD64545),
     };
 
@@ -145,6 +145,9 @@ class RouteDetailScreen extends StatelessWidget {
                     _TimelineItem(
                       segment: plan.segments[index],
                       isLast: index == plan.segments.length - 1,
+                      cumulativeMinutes: plan.segments
+                          .take(index + 1)
+                          .fold(0, (sum, s) => sum + s.durationMinutes),
                     ),
                 ],
               ),
@@ -214,10 +217,15 @@ class _TransportBadge extends StatelessWidget {
 }
 
 class _TimelineItem extends StatelessWidget {
-  const _TimelineItem({required this.segment, required this.isLast});
+  const _TimelineItem({
+    required this.segment,
+    required this.isLast,
+    required this.cumulativeMinutes,
+  });
 
   final RouteSegment segment;
   final bool isLast;
+  final int cumulativeMinutes;
 
   @override
   Widget build(BuildContext context) {
@@ -277,20 +285,30 @@ class _TimelineItem extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(99),
                         ),
                         child: Text(
-                          '${segment.durationMinutes}분',
-                          style: TextStyle(color: color, fontWeight: FontWeight.w700),
+                          '+${segment.durationMinutes}분',
+                          style: TextStyle(
+                              color: color, fontWeight: FontWeight.w700),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Text(segment.detail),
+                  const SizedBox(height: 4),
+                  Text(
+                    '출발 후 $cumulativeMinutes분',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: color.withValues(alpha: 0.7),
+                    ),
+                  ),
                 ],
               ),
             ),

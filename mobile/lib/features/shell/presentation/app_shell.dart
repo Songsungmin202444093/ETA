@@ -36,12 +36,18 @@ class _AppShellState extends State<AppShell> {
     }
 
     setState(() {
-      _savedRoutes = [...routes];
+      _savedRoutes = _normalizeSavedRoutes([...routes]);
     });
   }
 
   Future<void> _persistSavedRoutes(List<SavedRoute> routes) {
     return SavedRouteStorage.save(routes);
+  }
+
+  List<SavedRoute> _normalizeSavedRoutes(List<SavedRoute> routes) {
+    final pinned = routes.where((route) => route.isPinned).toList();
+    final unpinned = routes.where((route) => !route.isPinned).toList();
+    return [...pinned, ...unpinned];
   }
 
   void _openRoute(TripPlan plan) {
@@ -61,7 +67,9 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _updateSavedRoute(SavedRoute route) {
-    final nextRoutes = _savedRoutes.map((item) => item.id == route.id ? route : item).toList();
+    final nextRoutes = _normalizeSavedRoutes(
+      _savedRoutes.map((item) => item.id == route.id ? route : item).toList(),
+    );
 
     setState(() {
       _savedRoutes = nextRoutes;
@@ -71,7 +79,7 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _createSavedRoute(SavedRoute route) {
-    final nextRoutes = [route, ..._savedRoutes];
+    final nextRoutes = _normalizeSavedRoutes([route, ..._savedRoutes]);
 
     setState(() {
       _savedRoutes = nextRoutes;
@@ -81,13 +89,64 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _deleteSavedRoute(String routeId) {
-    final nextRoutes = _savedRoutes.where((item) => item.id != routeId).toList();
+    final nextRoutes = _normalizeSavedRoutes(
+      _savedRoutes.where((item) => item.id != routeId).toList(),
+    );
 
     setState(() {
       _savedRoutes = nextRoutes;
     });
 
     _persistSavedRoutes(nextRoutes);
+  }
+
+  void _toggleSavedRoutePin(String routeId) {
+    final nextRoutes = _normalizeSavedRoutes(
+      _savedRoutes
+          .map(
+            (item) => item.id == routeId ? item.copyWith(isPinned: !item.isPinned) : item,
+          )
+          .toList(),
+    );
+
+    setState(() {
+      _savedRoutes = nextRoutes;
+    });
+
+    _persistSavedRoutes(nextRoutes);
+  }
+
+  void _moveSavedRoute(String routeId, int offset) {
+    final index = _savedRoutes.indexWhere((item) => item.id == routeId);
+    if (index == -1) {
+      return;
+    }
+
+    final route = _savedRoutes[index];
+    final sameSectionIndexes = <int>[];
+    for (var i = 0; i < _savedRoutes.length; i++) {
+      if (_savedRoutes[i].isPinned == route.isPinned) {
+        sameSectionIndexes.add(i);
+      }
+    }
+
+    final sectionIndex = sameSectionIndexes.indexOf(index);
+    final nextSectionIndex = sectionIndex + offset;
+    if (nextSectionIndex < 0 || nextSectionIndex >= sameSectionIndexes.length) {
+      return;
+    }
+
+    final targetIndex = sameSectionIndexes[nextSectionIndex];
+    final nextRoutes = [..._savedRoutes];
+    final movingRoute = nextRoutes.removeAt(index);
+    nextRoutes.insert(targetIndex, movingRoute);
+    final normalized = _normalizeSavedRoutes(nextRoutes);
+
+    setState(() {
+      _savedRoutes = normalized;
+    });
+
+    _persistSavedRoutes(normalized);
   }
 
   @override
@@ -112,6 +171,8 @@ class _AppShellState extends State<AppShell> {
         savedRoutes: _savedRoutes,
         onCreateRoute: _createSavedRoute,
         onUpdateRoute: _updateSavedRoute,
+        onTogglePin: _toggleSavedRoutePin,
+        onMoveRoute: _moveSavedRoute,
         onDeleteRoute: _deleteSavedRoute,
       ),
     ];

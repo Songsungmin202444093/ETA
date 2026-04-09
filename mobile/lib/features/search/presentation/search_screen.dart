@@ -115,10 +115,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   String get _marginStageLabel {
     if (_transferMarginMinutes >= 7) {
-      return '안전';
+      return '여유';
     }
     if (_transferMarginMinutes >= 4) {
-      return '주의';
+      return '보통';
     }
     return '위험';
   }
@@ -359,6 +359,91 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  Future<void> _saveRecommendedPlan(TripPlan plan) async {
+    final isDuplicate = widget.savedRoutes.any(
+      (route) =>
+          route.origin == plan.origin &&
+          route.destination == plan.destination &&
+          route.name == plan.title,
+    );
+
+    if (isDuplicate) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이미 저장된 추천 경로입니다. 저장 탭에서 순서를 바꿀 수 있습니다.')),
+      );
+      return;
+    }
+
+    final nameController = TextEditingController(text: plan.title);
+    final summaryController = TextEditingController(
+      text: '총 ${plan.totalMinutes}분, ${plan.transferCount}회 환승, ${plan.riskLevel}',
+    );
+
+    final route = await showModalBottomSheet<SavedRoute>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('추천 경로 저장', style: Theme.of(sheetContext).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text('${plan.origin} → ${plan.destination}'),
+              const SizedBox(height: 18),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: '저장 이름'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: summaryController,
+                decoration: const InputDecoration(labelText: '한 줄 설명'),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop(
+                      SavedRoute(
+                        id: DateTime.now().microsecondsSinceEpoch.toString(),
+                        name: nameController.text.trim().isEmpty ? plan.title : nameController.text.trim(),
+                        origin: plan.origin,
+                        destination: plan.destination,
+                        nextDeparture: plan.departureTime,
+                        summary: summaryController.text.trim().isEmpty
+                            ? '총 ${plan.totalMinutes}분, ${plan.transferCount}회 환승, ${plan.riskLevel}'
+                            : summaryController.text.trim(),
+                      ),
+                    );
+                  },
+                  child: const Text('추천 경로 저장'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted || route == null) {
+      return;
+    }
+
+    widget.onSaveRoute(route);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('추천 경로를 저장했습니다. 저장 탭에서 고정과 순서 변경이 가능합니다.')),
+    );
+  }
+
   List<TripPlan> get _orderedPlans {
     final plans = [..._searchedPlans];
 
@@ -376,9 +461,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   int _riskRank(String riskLevel) {
     switch (riskLevel) {
-      case '안전':
+      case '여유':
         return 0;
-      case '주의':
+      case '보통':
         return 1;
       default:
         return 2;
@@ -640,7 +725,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Text('기준: 3분 이하 위험, 4~6분 주의, 7분 이상 안전'),
+                        Text('기준: 3분 이하 위험, 4~6분 보통, 7분 이상 여유'),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -699,6 +784,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       child: _PlanCard(
                         plan: plan,
                         onTap: () => widget.onOpenRoute(plan),
+                        onSave: () => _saveRecommendedPlan(plan),
                       ),
                     ),
                   )
@@ -737,10 +823,11 @@ class _MinuteInput extends StatelessWidget {
 }
 
 class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.plan, required this.onTap});
+  const _PlanCard({required this.plan, required this.onTap, required this.onSave});
 
   final TripPlan plan;
   final VoidCallback onTap;
+  final VoidCallback onSave;
 
   List<RouteSegment> get _transportSegments =>
       plan.segments.where((segment) => segment.mode != '도보').toList();
@@ -748,8 +835,8 @@ class _PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final riskColor = switch (plan.riskLevel) {
-      '안전' => const Color(0xFF1F8F63),
-      '주의' => const Color(0xFFF28F3B),
+      '여유' => const Color(0xFF1F8F63),
+      '보통' => const Color(0xFFF28F3B),
       _ => const Color(0xFFD64545),
     };
 
@@ -846,6 +933,15 @@ class _PlanCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(child: Text(plan.recommendation)),
               ],
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: onSave,
+                icon: const Icon(Icons.bookmark_add_outlined),
+                label: const Text('이 추천 저장'),
+              ),
             ),
           ],
         ),
