@@ -9,6 +9,12 @@ class AppTheme {
   static const Color text = Color(0xFF13202B);
   static const Color muted = Color(0xFF6A7785);
 
+  // 다크 모드 전용 색상
+  static const Color darkCanvas = Color(0xFF0F1923);
+  static const Color darkCard = Color(0xFF1A2635);
+  static const Color darkText = Color(0xFFE8EEF4);
+  static const Color darkMuted = Color(0xFF8A9BAD);
+
   static ThemeData light() {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: primary,
@@ -74,6 +80,78 @@ class AppTheme {
       chipTheme: ChipThemeData(
         backgroundColor: primary.withValues(alpha: 0.08),
         selectedColor: secondary.withValues(alpha: 0.18),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        side: BorderSide.none,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  static ThemeData dark() {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: secondary,
+      primary: secondary,
+      secondary: accent,
+      tertiary: accent,
+      surface: darkCard,
+      brightness: Brightness.dark,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: darkCanvas,
+      textTheme: const TextTheme(
+        headlineMedium: TextStyle(
+          fontSize: 28,
+          fontWeight: FontWeight.w800,
+          color: darkText,
+          height: 1.1,
+        ),
+        titleLarge: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          color: darkText,
+        ),
+        titleMedium: TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+          color: darkText,
+        ),
+        bodyLarge: TextStyle(
+          fontSize: 16,
+          color: darkText,
+          height: 1.45,
+        ),
+        bodyMedium: TextStyle(
+          fontSize: 14,
+          color: darkMuted,
+          height: 1.45,
+        ),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        foregroundColor: darkText,
+        elevation: 0,
+        centerTitle: false,
+      ),
+      cardTheme: CardThemeData(
+        color: darkCard,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: darkCard,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: secondary.withValues(alpha: 0.15),
+        selectedColor: secondary.withValues(alpha: 0.30),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         side: BorderSide.none,
         labelStyle: const TextStyle(fontWeight: FontWeight.w600),

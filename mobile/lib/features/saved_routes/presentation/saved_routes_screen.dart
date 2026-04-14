@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart' show Share;
 
 import '../../../core/data/demo_data.dart';
 import '../../../core/models/bus_eta_models.dart';
+import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/surface_section.dart';
 
 class SavedRoutesScreen extends StatefulWidget {
@@ -15,6 +17,7 @@ class SavedRoutesScreen extends StatefulWidget {
     required this.onTogglePin,
     required this.onMoveRoute,
     required this.onDeleteRoute,
+    required this.onRefresh,
   });
 
   final ValueChanged<TripPlan> onOpenRoute;
@@ -25,6 +28,7 @@ class SavedRoutesScreen extends StatefulWidget {
   final ValueChanged<String> onTogglePin;
   final void Function(String routeId, int offset) onMoveRoute;
   final ValueChanged<String> onDeleteRoute;
+  final Future<void> Function() onRefresh;
 
   @override
   State<SavedRoutesScreen> createState() => _SavedRoutesScreenState();
@@ -32,6 +36,27 @@ class SavedRoutesScreen extends StatefulWidget {
 
 class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
   String? _selectedTag;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // 첫 렌더 후 스켈레톤 표시 → 짧은 딜레이 후 실제 데이터로 전환
+    Future.delayed(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _isLoading = false);
+    });
+  }
+
+  void _shareRoute(SavedRoute route) {
+    Share.share(
+      '📍 ${route.name}\n'
+      '출발: ${route.origin}\n'
+      '도착: ${route.destination}\n'
+      '${route.summary}\n\n'
+      'BusETA 앱으로 확인해보세요!',
+      subject: 'BusETA 경로 공유',
+    );
+  }
 
   Set<String> get _allTags => {
         for (final r in widget.savedRoutes) ...r.tags,
@@ -291,13 +316,18 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
     final allTags = _allTags;
     final routes = _filteredRoutes;
 
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: widget.onRefresh,
+      child: ListView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
       children: [
         Text('저장 경로', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),
-        Text('자주 쓰는 이동 경로를 저장해 반복 이동을 빠르게 확인할 수 있습니다.'),
-        if (allTags.isNotEmpty) ...[
+        const Text('자주 쓰는 이동 경로를 저장해 반복 이동을 빠르게 확인할 수 있습니다.'),
+        if (_isLoading) ...[
+          const SizedBox(height: 20),
+          const SkeletonList(count: 3, type: SkeletonType.savedRoute),
+        ] else if (allTags.isNotEmpty) ...[
           const SizedBox(height: 14),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -488,6 +518,11 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
                                         widget.onOpenRoute(plan),
                                     child: const Text('상세 보기'),
                                   ),
+                                  OutlinedButton.icon(
+                                    onPressed: () => _shareRoute(item),
+                                    icon: const Icon(Icons.share_rounded),
+                                    label: const Text('공유'),
+                                  ),
                                   TextButton(
                                     onPressed: () =>
                                         _confirmDelete(context, item),
@@ -504,6 +539,7 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
           ),
         ),
       ],
+      ),
     );
   }
 }

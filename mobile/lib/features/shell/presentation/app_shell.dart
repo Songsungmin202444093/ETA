@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../app/theme/app_theme.dart';
 import '../../../core/data/demo_data.dart';
 import '../../../core/models/bus_eta_models.dart';
 import '../../../core/storage/saved_route_storage.dart';
+import '../../auth/presentation/login_screen.dart';
 import '../../home/presentation/home_screen.dart';
 import '../../map/presentation/map_screen.dart';
+import '../../profile/presentation/profile_screen.dart';
 import '../../route/presentation/route_detail_screen.dart';
 import '../../saved_routes/presentation/saved_routes_screen.dart';
 import '../../search/presentation/search_screen.dart';
+import '../../settings/presentation/settings_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -156,6 +161,7 @@ class _AppShellState extends State<AppShell> {
         onOpenRoute: _openRoute,
         onLoadSearch: _openSearchWithPair,
         savedRoutes: _savedRoutes,
+        onRefresh: _loadSavedRoutes,
       ),
       SearchScreen(
         onOpenRoute: _openRoute,
@@ -174,6 +180,7 @@ class _AppShellState extends State<AppShell> {
         onTogglePin: _toggleSavedRoutePin,
         onMoveRoute: _moveSavedRoute,
         onDeleteRoute: _deleteSavedRoute,
+        onRefresh: _loadSavedRoutes,
       ),
     ];
 
@@ -181,6 +188,79 @@ class _AppShellState extends State<AppShell> {
       body: Stack(
         children: [
           Positioned.fill(child: IndexedStack(index: _currentIndex, children: screens)),
+          // 로그아웃 버튼 (우측 상단)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 16,
+            child: SafeArea(
+              child: PopupMenuButton<String>(
+                icon: const CircleAvatar(
+                  radius: 18,
+                  backgroundColor: AppTheme.primary,
+                  child: Icon(Icons.person_outline_rounded,
+                      color: Colors.white, size: 20),
+                ),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                onSelected: (value) async {
+                  if (value == 'profile') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                    );
+                  } else if (value == 'settings') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    );
+                  } else if (value == 'logout') {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.remove('auto_login');
+                    if (!mounted) return;
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                          builder: (_) => const LoginScreen()),
+                      (_) => false,
+                    );
+                  }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'profile',
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_rounded, size: 18, color: AppTheme.text),
+                        SizedBox(width: 10),
+                        Text('내 정보'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'settings',
+                    child: Row(
+                      children: [
+                        Icon(Icons.settings_rounded, size: 18, color: AppTheme.text),
+                        SizedBox(width: 10),
+                        Text('설정'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'logout',
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout_rounded,
+                            size: 18, color: Colors.redAccent),
+                        SizedBox(width: 10),
+                        Text('로그아웃', style: TextStyle(color: Colors.redAccent)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           Positioned(
             left: 20,
             right: 20,

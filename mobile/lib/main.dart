@@ -1,8 +1,8 @@
+import 'app/bus_eta_app.dart';
 import 'package:flutter/material.dart';
 
-import 'app/bus_eta_app.dart';
-
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -11,6 +11,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const BusEtaApp();
+    return BusEtaApp(key: busEtaAppKey);
   }
 }

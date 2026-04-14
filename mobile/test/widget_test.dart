@@ -9,7 +9,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:mobile/main.dart';
+import 'package:mobile/app/theme/app_theme.dart';
+import 'package:mobile/features/auth/presentation/forgot_password_screen.dart';
+import 'package:mobile/features/auth/presentation/login_screen.dart';
+import 'package:mobile/features/auth/presentation/signup_screen.dart';
+import 'package:mobile/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:mobile/features/profile/presentation/profile_screen.dart';
+import 'package:mobile/features/settings/presentation/settings_screen.dart';
+import 'package:mobile/features/shell/presentation/app_shell.dart';
+import 'package:mobile/features/splash/presentation/splash_screen.dart';
+
+/// 테스트용 헬퍼: AppShell을 바로 띄워 로그인 화면을 건너뜁니다.
+Future<void> pumpApp(WidgetTester tester) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: AppTheme.light(),
+      home: const AppShell(),
+    ),
+  );
+  // HomeScreen(_isLoading 600ms) + SavedRoutesScreen(_isLoading 800ms) 딜레이 대기
+  await tester.pump(const Duration(milliseconds: 1000));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   final savedTabFinder = find.descendant(
@@ -21,7 +42,7 @@ void main() {
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MyApp());
+    await pumpApp(tester);
 
     expect(find.text('BusETA'), findsOneWidget);
     expect(find.text('추천 경로 한눈에'), findsOneWidget);
@@ -47,7 +68,7 @@ void main() {
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MyApp());
+    await pumpApp(tester);
 
     await tester.tap(savedTabFinder);
     await tester.pumpAndSettle();
@@ -91,7 +112,7 @@ void main() {
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MyApp());
+    await pumpApp(tester);
 
     await tester.tap(find.text('검색'));
     await tester.pumpAndSettle();
@@ -134,7 +155,7 @@ void main() {
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MyApp());
+    await pumpApp(tester);
 
     await tester.tap(savedTabFinder);
     await tester.pumpAndSettle();
@@ -185,7 +206,7 @@ void main() {
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MyApp());
+    await pumpApp(tester);
 
     await tester.tap(find.text('검색'));
     await tester.pumpAndSettle();
@@ -221,7 +242,7 @@ void main() {
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MyApp());
+    await pumpApp(tester);
 
     await tester.tap(find.text('검색'));
     await tester.pumpAndSettle();
@@ -288,7 +309,7 @@ void main() {
     WidgetTester tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const MyApp());
+    await pumpApp(tester);
 
     // 홈 탭은 기본 탭
     expect(find.text('BusETA'), findsOneWidget);
@@ -312,5 +333,175 @@ void main() {
     // 핀 고정 경로에서 검색 불러오기 버튼도 동작한다
     final loadButtons = find.widgetWithText(OutlinedButton, '검색에 불러오기');
     expect(loadButtons, findsWidgets);
+  });
+
+  testWidgets('로그인 화면이 올바르게 표시된다', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: LoginScreen()),
+    );
+
+    expect(find.text('BusETA'), findsOneWidget);
+    expect(find.text('로그인'), findsOneWidget);
+    expect(find.text('계정이 없으신가요?'), findsOneWidget);
+    expect(find.text('회원가입'), findsOneWidget);
+  });
+
+  testWidgets('로그인 폼 유효성 검사가 동작한다', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: LoginScreen()),
+    );
+
+    // 빈 상태로 로그인 시도
+    await tester.tap(find.widgetWithText(FilledButton, '로그인'));
+    await tester.pump();
+
+    expect(find.text('이메일을 입력해 주세요.'), findsOneWidget);
+    expect(find.text('비밀번호를 입력해 주세요.'), findsOneWidget);
+
+    // 이메일 형식 오류
+    await tester.enterText(find.byType(TextFormField).first, 'invalid-email');
+    await tester.tap(find.widgetWithText(FilledButton, '로그인'));
+    await tester.pump();
+    expect(find.text('올바른 이메일 형식이 아닙니다.'), findsOneWidget);
+  });
+
+  testWidgets('회원가입 화면이 올바르게 표시된다', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: SignupScreen()),
+    );
+
+    expect(find.text('회원가입'), findsOneWidget);
+    expect(find.text('이름'), findsOneWidget);
+    expect(find.text('이메일'), findsOneWidget);
+    expect(find.text('비밀번호'), findsOneWidget);
+    expect(find.text('비밀번호 확인'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '가입하기'), findsOneWidget);
+  });
+
+  testWidgets('회원가입 비밀번호 불일치 검사가 동작한다', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: SignupScreen()),
+    );
+
+    final fields = find.byType(TextFormField);
+    await tester.enterText(fields.at(0), '홍길동');
+    await tester.enterText(fields.at(1), 'test@email.com');
+    await tester.enterText(fields.at(2), 'password123');
+    await tester.enterText(fields.at(3), 'different123');
+
+    await tester.tap(find.widgetWithText(FilledButton, '가입하기'));
+    await tester.pump();
+
+    expect(find.text('비밀번호가 일치하지 않습니다.'), findsOneWidget);
+  });
+
+  testWidgets('비밀번호 찾기 화면이 올바르게 동작한다', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: ForgotPasswordScreen()),
+    );
+
+    expect(find.text('비밀번호 찾기'), findsOneWidget);
+    expect(find.text('재설정 링크 보내기'), findsOneWidget);
+
+    // 빈 폼 제출
+    await tester.tap(find.widgetWithText(FilledButton, '재설정 링크 보내기'));
+    await tester.pump();
+    expect(find.text('이메일을 입력해 주세요.'), findsOneWidget);
+
+    // 올바른 이메일 입력 후 제출 → 성공 화면
+    await tester.enterText(find.byType(TextFormField), 'test@email.com');
+    await tester.tap(find.widgetWithText(FilledButton, '재설정 링크 보내기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('이메일을 확인해 주세요'), findsOneWidget);
+    expect(find.text('로그인으로 돌아가기'), findsOneWidget);
+  });
+
+  testWidgets('회원가입 비밀번호 강도 표시가 동작한다', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: SignupScreen()),
+    );
+
+    final passwordField = find.byType(TextFormField).at(2);
+
+    // 약함 (7자)
+    await tester.enterText(passwordField, 'abc1234');
+    await tester.pump();
+    expect(find.text('보안 강도: 약함'), findsOneWidget);
+
+    // 보통 (8자)
+    await tester.enterText(passwordField, 'abc12345');
+    await tester.pump();
+    expect(find.text('보안 강도: 보통'), findsOneWidget);
+
+    // 강함 (12자 + 숫자 + 특수문자)
+    await tester.enterText(passwordField, 'Abcdef12345!');
+    await tester.pump();
+    expect(find.text('보안 강도: 강함'), findsOneWidget);
+  });
+
+  testWidgets('온보딩 슬라이드가 올바르게 동작한다', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(theme: AppTheme.light(), home: const OnboardingScreen()),
+    );
+
+    // 첫 번째 슬라이드 확인
+    expect(find.text('실시간 버스 도착 정보'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '다음'), findsOneWidget);
+
+    // 두 번째 슬라이드로 이동
+    await tester.tap(find.widgetWithText(FilledButton, '다음'));
+    await tester.pumpAndSettle();
+    expect(find.text('경로 검색 & 저장'), findsOneWidget);
+
+    // 마지막 슬라이드까지 이동
+    await tester.tap(find.widgetWithText(FilledButton, '다음'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '다음'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(FilledButton, '시작하기'), findsOneWidget);
+  });
+
+  testWidgets('프로필 화면이 올바르게 표시된다', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(theme: AppTheme.light(), home: const ProfileScreen()),
+    );
+
+    expect(find.text('내 정보'), findsOneWidget);
+    expect(find.text('이름'), findsOneWidget);
+    expect(find.text('이메일'), findsOneWidget);
+    expect(find.text('비밀번호 변경'), findsOneWidget);
+    expect(find.text('로그아웃'), findsOneWidget);
+  });
+
+  testWidgets('설정 화면이 올바르게 표시된다', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      MaterialApp(theme: AppTheme.light(), home: const SettingsScreen()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('설정'), findsOneWidget);
+    expect(find.text('다크 모드'), findsOneWidget);
+    expect(find.text('도착 알림'), findsOneWidget);
+    expect(find.text('캐시 초기화'), findsOneWidget);
+    expect(find.text('앱 버전'), findsOneWidget);
+  });
+
+  testWidgets('스플래시 화면이 올바르게 표시된다', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({'onboarding_done': true});
+    await tester.pumpWidget(
+      MaterialApp(theme: AppTheme.light(), home: const SplashScreen()),
+    );
+    // 애니메이션 시작 직후 UI 확인
+    await tester.pump();
+    expect(find.text('BusETA'), findsOneWidget);
+    expect(find.text('정확한 도착 예측, 스마트한 이동'), findsOneWidget);
+    expect(find.byIcon(Icons.directions_bus_rounded), findsOneWidget);
+
+    // 대기 타이머(1.8초) + 화면 전환 완료까지 펌프
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
   });
 }

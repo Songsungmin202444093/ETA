@@ -2,19 +2,37 @@ import 'package:flutter/material.dart';
 
 import '../../../core/data/demo_data.dart';
 import '../../../core/models/bus_eta_models.dart';
+import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/surface_section.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.onOpenRoute,
     required this.onLoadSearch,
     required this.savedRoutes,
+    required this.onRefresh,
   });
 
   final ValueChanged<TripPlan> onOpenRoute;
   final ValueChanged<SearchPair> onLoadSearch;
   final List<SavedRoute> savedRoutes;
+  final Future<void> Function() onRefresh;
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) setState(() => _isLoading = false);
+    });
+  }
 
   List<TripPlan> get _featuredPlans => DemoData.routeCandidates(
         origin: '우리집',
@@ -25,7 +43,9 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: widget.onRefresh,
+      child: ListView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
       children: [
         Text('BusETA', style: theme.textTheme.headlineMedium),
@@ -35,6 +55,11 @@ class HomeScreen extends StatelessWidget {
           style: theme.textTheme.bodyLarge,
         ),
         const SizedBox(height: 18),
+        if (_isLoading) ...[
+          const SkeletonBox(width: double.infinity, height: 160, borderRadius: 30),
+          const SizedBox(height: 18),
+          const SkeletonList(count: 2, type: SkeletonType.routeCard),
+        ] else ...[
         Container(
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
@@ -70,7 +95,7 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               FilledButton.tonal(
-                onPressed: () => onOpenRoute(DemoData.recommendedPlans.first),
+                onPressed: () => widget.onOpenRoute(DemoData.recommendedPlans.first),
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: const Color(0xFF163B59),
@@ -92,7 +117,7 @@ class HomeScreen extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _RouteHighlightCard(
                       plan: plan,
-                      onTap: () => onOpenRoute(plan),
+                      onTap: () => widget.onOpenRoute(plan),
                     ),
                   ),
                 )
@@ -115,20 +140,20 @@ class HomeScreen extends StatelessWidget {
                 .toList(),
           ),
         ),
-        if (savedRoutes.any((r) => r.isPinned)) ...[
+        if (widget.savedRoutes.any((r) => r.isPinned)) ...[
           const SizedBox(height: 18),
           SurfaceSection(
             title: '즐겨찾기',
             subtitle: '핀 고정한 경로입니다. 저장 탭에서 고정을 관리할 수 있습니다.',
             child: Column(
-              children: savedRoutes
+              children: widget.savedRoutes
                   .where((r) => r.isPinned)
                   .map((route) => Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _HomeSavedRouteCard(
                           route: route,
-                          onOpenRoute: onOpenRoute,
-                          onLoadSearch: onLoadSearch,
+                          onOpenRoute: widget.onOpenRoute,
+                          onLoadSearch: widget.onLoadSearch,
                         ),
                       ))
                   .toList(),
@@ -140,22 +165,24 @@ class HomeScreen extends StatelessWidget {
           title: '저장된 경로',
           subtitle: '최근 검색과 달리 직접 관리하는 북마크 경로입니다. 이름 변경과 삭제는 저장 탭에서 합니다.',
           child: Column(
-            children: savedRoutes.where((r) => !r.isPinned).isEmpty
+            children: widget.savedRoutes.where((r) => !r.isPinned).isEmpty
                 ? const [_EmptySavedRouteCard()]
-                : savedRoutes
+                : widget.savedRoutes
                     .where((r) => !r.isPinned)
                     .map((route) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: _HomeSavedRouteCard(
                             route: route,
-                            onOpenRoute: onOpenRoute,
-                            onLoadSearch: onLoadSearch,
+                            onOpenRoute: widget.onOpenRoute,
+                            onLoadSearch: widget.onLoadSearch,
                           ),
                         ))
                     .toList(),
           ),
         ),
+        ], // else 블록 끝
       ],
+      ),
     );
   }
 }
@@ -265,12 +292,38 @@ class _EmptySavedRouteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FBFD),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+          width: 1,
+        ),
       ),
-      child: const Text('저장된 경로가 없습니다. 저장 탭에서 발표용 경로를 다시 관리할 수 있습니다.'),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.bookmark_border_rounded,
+            size: 48,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '저장된 경로가 없어요',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '저장 탭에서 자주 가는 경로를\n등록하면 여기서 바로 확인할 수 있습니다.',
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }
