@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/data/demo_data.dart';
 import '../../../core/models/bus_eta_models.dart';
+import '../../../core/services/location_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../shared/widgets/skeleton.dart';
 import '../../../shared/widgets/surface_section.dart';
 
@@ -25,6 +27,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
+  LocationStatus _locationStatus = LocationStatus.unknown;
 
   @override
   void initState() {
@@ -32,6 +35,17 @@ class _HomeScreenState extends State<HomeScreen> {
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) setState(() => _isLoading = false);
     });
+    _checkLocation();
+  }
+
+  Future<void> _checkLocation() async {
+    final status = await LocationService.instance.checkStatus();
+    if (mounted) setState(() => _locationStatus = status);
+  }
+
+  Future<void> _requestLocation() async {
+    final status = await LocationService.instance.requestPermission();
+    if (mounted) setState(() => _locationStatus = status);
   }
 
   List<TripPlan> get _featuredPlans => DemoData.routeCandidates(
@@ -128,7 +142,30 @@ class _HomeScreenState extends State<HomeScreen> {
         SurfaceSection(
           title: '주변 정류장',
           subtitle: 'GPS 기반으로 가까운 정류장을 우선 표시합니다.',
-          trailing: TextButton(onPressed: () {}, child: const Text('전체 보기')),
+          trailing: _locationStatus == LocationStatus.granted
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.gps_fixed_rounded, size: 14, color: Colors.green.shade600),
+                    const SizedBox(width: 4),
+                    Text('GPS 연결됨',
+                        style: TextStyle(fontSize: 12, color: Colors.green.shade600)),
+                  ],
+                )
+              : TextButton.icon(
+                  onPressed: _locationStatus == LocationStatus.deniedForever
+                      ? () => LocationService.instance.requestPermission()
+                      : _requestLocation,
+                  icon: const Icon(Icons.location_off_rounded, size: 14),
+                  label: Text(
+                    _locationStatus == LocationStatus.deniedForever ? '설정에서 허용' : '위치 허용',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
           child: Column(
             children: DemoData.nearbyStations
                 .map(
@@ -351,6 +388,55 @@ class _StationCard extends StatelessWidget {
 
   final NearbyStation station;
 
+  static Future<void> _showArrivalAlertDialog(
+    BuildContext context,
+    NearbyStation station,
+    ArrivalInfo arrival,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${arrival.line} 버스 알림 설정'),
+        content: Text(
+          '${station.name} 정류장에 ${arrival.line}번 버스가\n'
+          '약 ${arrival.arrivalMinutes}분 후 도착합니다.\n\n'
+          '1분 전에 알림을 보내드릴까요?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('알림 설정'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await NotificationService.instance.scheduleArrivalAlert(
+      id: arrival.line.hashCode ^ station.name.hashCode,
+      stationName: station.name,
+      line: arrival.line,
+      arrivalMinutes: arrival.arrivalMinutes,
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            arrival.arrivalMinutes <= 1
+                ? '${arrival.line}번 버스 알림이 설정되었습니다.'
+                : '${arrival.line}번 버스 ${arrival.arrivalMinutes - 1}분 후 알림을 설정했습니다.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -385,15 +471,25 @@ class _StationCard extends StatelessWidget {
             runSpacing: 8,
             children: station.arrivals
                 .map(
-                  (arrival) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      '${arrival.line} · ${arrival.arrivalMinutes}분 · ${arrival.remainingStops}정거장 전',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                  (arrival) => GestureDetector(
+                    onTap: () => _showArrivalAlertDialog(context, station, arrival),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${arrival.line} · ${arrival.arrivalMinutes}분 · ${arrival.remainingStops}정거장 전',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.notifications_none_rounded, size: 14),
+                        ],
+                      ),
                     ),
                   ),
                 )

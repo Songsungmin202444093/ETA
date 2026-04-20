@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/bus_eta_app.dart';
+import '../../../core/services/notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -43,6 +44,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _toggleNotifications(bool value) async {
+    if (value) {
+      final granted = await NotificationService.instance.requestPermission();
+      if (!mounted) return;
+      if (!granted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('알림 권한이 거부되었습니다. 설정에서 허용해 주세요.')),
+        );
+        return;
+      }
+    } else {
+      await NotificationService.instance.cancelAll();
+    }
     setState(() => _notifications = value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notifications', value);
