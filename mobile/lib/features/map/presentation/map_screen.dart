@@ -188,14 +188,16 @@ class _MapScreenState extends State<MapScreen> {
                   if (s.latitude != null && s.longitude != null)
                     Marker(
                       point: LatLng(s.latitude!, s.longitude!),
-                      width: 90,
-                      height: 68,
+                      width: 80,
+                      height: 72,
+                      alignment: Alignment.bottomCenter,
                       child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
                         onTap: () {
                           setState(() => _selectedStation = s);
                           _mapController.move(LatLng(s.latitude!, s.longitude!), 16);
                         },
-                        child: _StationMarker(name: s.name, icon: Icons.directions_bus_rounded),
+                        child: _StationMarker(name: s.name),
                       ),
                     ),
                 // 버스 위치 마커
@@ -333,41 +335,45 @@ class _MapScreenState extends State<MapScreen> {
 // ── 위젯 ──────────────────────────────────────────────────────
 
 class _StationMarker extends StatelessWidget {
-  const _StationMarker({required this.name, required this.icon});
+  const _StationMarker({required this.name});
   final String name;
-  final IconData icon;
+
+  /// '.' 기준 첫 번째 의미 단위만 표시 (예: "인계동행정복지센터.KBS…" → "인계동행정복지센터")
+  String get _shortName => name.split('.').first;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
-          decoration: const BoxDecoration(
-            color: Color(0xFF163B59),
-            shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6)],
-          ),
-          child: Icon(icon, color: Colors.white, size: 16),
-        ),
-        const SizedBox(height: 3),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(99),
-            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+            border: Border.all(color: Color(0xFF163B59), width: 1),
           ),
           child: Text(
-            name,
+            _shortName,
             style: const TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
               color: Color(0xFF163B59),
             ),
-            overflow: TextOverflow.ellipsis,
           ),
+        ),
+        const SizedBox(height: 2),
+        Container(
+          width: 32,
+          height: 32,
+          decoration: const BoxDecoration(
+            color: Color(0xFF163B59),
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 6, offset: Offset(0, 2))],
+          ),
+          child: const Icon(Icons.directions_bus_filled_rounded, color: Colors.white, size: 18),
         ),
       ],
     );
