@@ -4,12 +4,28 @@ class NearbyStation {
     required this.distanceMeters,
     required this.lines,
     required this.arrivals,
+    this.stationId,
+    this.latitude,
+    this.longitude,
   });
 
   final String name;
   final int distanceMeters;
   final List<String> lines;
   final List<ArrivalInfo> arrivals;
+  final String? stationId;
+  final double? latitude;
+  final double? longitude;
+
+  NearbyStation copyWithArrivals(List<ArrivalInfo> arrivals) => NearbyStation(
+        name: name,
+        distanceMeters: distanceMeters,
+        lines: arrivals.map((a) => a.line).toSet().toList(),
+        arrivals: arrivals,
+        stationId: stationId,
+        latitude: latitude,
+        longitude: longitude,
+      );
 }
 
 class ArrivalInfo {
@@ -18,12 +34,36 @@ class ArrivalInfo {
     required this.arrivalMinutes,
     required this.remainingStops,
     required this.direction,
+    this.routeId,
+    this.plateNo,
   });
 
   final String line;
   final int arrivalMinutes;
   final int remainingStops;
   final String direction;
+  final String? routeId;
+  final String? plateNo;
+}
+
+class BusLocation {
+  const BusLocation({
+    required this.routeId,
+    required this.routeName,
+    required this.latitude,
+    required this.longitude,
+    required this.stationSeq,
+    this.plateNo,
+    this.remainSeatCnt,
+  });
+
+  final String routeId;
+  final String routeName;
+  final double latitude;
+  final double longitude;
+  final int stationSeq;
+  final String? plateNo;
+  final int? remainSeatCnt;
 }
 
 class RouteSegment {

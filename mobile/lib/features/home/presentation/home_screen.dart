@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/data/demo_data.dart';
 import '../../../core/models/bus_eta_models.dart';
+import '../../../core/services/bus_arrival_service.dart';
+import '../../../core/services/bus_stop_service.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../shared/widgets/skeleton.dart';
@@ -29,6 +31,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   LocationStatus _locationStatus = LocationStatus.unknown;
 
+  List<NearbyStation> _nearbyStations = [];
+  bool _stationsLoading = false;
+  String? _stationsError;
+
   @override
   void initState() {
     super.initState();
@@ -41,11 +47,61 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _checkLocation() async {
     final status = await LocationService.instance.checkStatus();
     if (mounted) setState(() => _locationStatus = status);
+    if (status == LocationStatus.granted) {
+      await _loadNearbyStations();
+    }
   }
 
   Future<void> _requestLocation() async {
     final status = await LocationService.instance.requestPermission();
     if (mounted) setState(() => _locationStatus = status);
+    if (status == LocationStatus.granted) {
+      await _loadNearbyStations();
+    }
+  }
+
+  Future<void> _loadNearbyStations() async {
+    if (mounted) setState(() { _stationsLoading = true; _stationsError = null; });
+
+    try {
+      final position = await LocationService.instance.getCurrentPosition();
+      if (position == null || !mounted) {
+        setState(() { _stationsLoading = false; _stationsError = 'GPS 위치를 가져올 수 없습니다.'; });
+        return;
+      }
+
+      final stations = await BusStopService.instance.getNearbyStations(
+        position.latitude,
+        position.longitude,
+      );
+
+      // 최대 5개 정류소에 대해 도착정보 병렬 조회
+      final withArrivals = await Future.wait(
+        stations.take(5).map((s) async {
+          if (s.stationId == null || s.stationId!.isEmpty) return s;
+          try {
+            final arrivals = await BusArrivalService.instance.getArrivalList(s.stationId!);
+            return s.copyWithArrivals(arrivals);
+          } catch (_) {
+            return s;
+          }
+        }),
+      );
+
+      if (mounted) {
+        setState(() {
+          _nearbyStations = withArrivals;
+          _stationsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _stationsLoading = false;
+          _stationsError = '정류장 정보를 불러오지 못했습니다.';
+        });
+      }
+    }
   }
 
   List<TripPlan> get _featuredPlans => DemoData.routeCandidates(
@@ -58,7 +114,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
 
     return RefreshIndicator(
-      onRefresh: widget.onRefresh,
+      onRefresh: () async {
+        await widget.onRefresh();
+        if (_locationStatus == LocationStatus.granted) {
+          await _loadNearbyStations();
+        }
+      },
       child: ListView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
       children: [
@@ -166,16 +227,47 @@ class _HomeScreenState extends State<HomeScreen> {
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
-          child: Column(
-            children: DemoData.nearbyStations
-                .map(
-                  (station) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _StationCard(station: station),
-                  ),
+          child: _stationsLoading
+              ? const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: SkeletonList(count: 3, type: SkeletonType.savedRoute),
                 )
-                .toList(),
-          ),
+              : _stationsError != null
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline_rounded,
+                              size: 16, color: Colors.red.shade400),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(_stationsError!,
+                                style: TextStyle(color: Colors.red.shade600)),
+                          ),
+                          TextButton(
+                            onPressed: _loadNearbyStations,
+                            child: const Text('재시도'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _nearbyStations.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Center(
+                            child: Text('주변 500m 내 정류장이 없습니다.'),
+                          ),
+                        )
+                      : Column(
+                          children: _nearbyStations
+                              .map(
+                                (station) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _StationCard(station: station),
+                                ),
+                              )
+                              .toList(),
+                        ),
         ),
         if (widget.savedRoutes.any((r) => r.isPinned)) ...[
           const SizedBox(height: 18),

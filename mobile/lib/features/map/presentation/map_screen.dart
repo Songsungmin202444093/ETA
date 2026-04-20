@@ -1,42 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../core/data/demo_data.dart';
 import '../../../core/models/bus_eta_models.dart';
+import '../../../core/services/bus_arrival_service.dart';
+import '../../../core/services/bus_location_service.dart';
+import '../../../core/services/bus_stop_service.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/notification_service.dart';
 
-// 인하대 주변 데모 좌표 (실제 주소 기반 근사치)
-const _kDefaultCenter = LatLng(37.4502, 126.6571);
-
-const _kStations = [
-  _StationData(
-    name: '인하대후문',
-    position: LatLng(37.4518, 126.6558),
-    icon: Icons.directions_bus_rounded,
-  ),
-  _StationData(
-    name: '용현사거리',
-    position: LatLng(37.4478, 126.6596),
-    icon: Icons.directions_bus_rounded,
-  ),
-  _StationData(
-    name: '인하대역 2번 출구',
-    position: LatLng(37.4490, 126.6488),
-    icon: Icons.train_rounded,
-  ),
-];
-
-// 데모 경로 폴리라인 (인하대후문 → 현재 위치 → 인하대역)
-const _kRoutePoints = [
-  LatLng(37.4518, 126.6558),
-  LatLng(37.4510, 126.6575),
-  LatLng(37.4502, 126.6571),
-  LatLng(37.4495, 126.6530),
-  LatLng(37.4490, 126.6488),
-];
+// 경기도 수원시 기본 중심 (API 데이터가 없을 때 폴백)
+const _kDefaultCenter = LatLng(37.2636, 127.0286);
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -53,10 +30,66 @@ class _MapScreenState extends State<MapScreen> {
   bool _loadingLocation = false;
   String? _locationError;
 
+  List<NearbyStation> _nearbyStations = [];
+  List<BusLocation> _busLocations = [];
+  bool _loadingStations = false;
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
-    // 자동 위치 요청은 생략 — 사용자가 "내 위치" 버튼을 누를 때 실행
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadStationsAndBuses(double lat, double lng) async {
+    if (mounted) setState(() => _loadingStations = true);
+    try {
+      final stations = await BusStopService.instance.getNearbyStations(lat, lng);
+
+      // 최대 5개 정류소 도착정보 병렬 조회
+      final withArrivals = await Future.wait(
+        stations.take(5).map((s) async {
+          if (s.stationId == null || s.stationId!.isEmpty) return s;
+          try {
+            final arrivals = await BusArrivalService.instance.getArrivalList(s.stationId!);
+            return s.copyWithArrivals(arrivals);
+          } catch (_) {
+            return s;
+          }
+        }),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _nearbyStations = withArrivals;
+        _loadingStations = false;
+      });
+
+      // 모든 노선의 버스 위치 조회
+      _refreshBusLocations();
+
+      // 30초마다 버스 위치 자동 갱신
+      _refreshTimer?.cancel();
+      _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (mounted) _refreshBusLocations();
+      });
+    } catch (e) {
+      if (mounted) setState(() => _loadingStations = false);
+    }
+  }
+
+  Future<void> _refreshBusLocations() async {
+    final allArrivals = _nearbyStations.expand((s) => s.arrivals).toList();
+    try {
+      final locs = await BusLocationService.instance.getBusLocationsForRoutes(allArrivals);
+      if (mounted) setState(() => _busLocations = locs);
+    } catch (_) {}
   }
 
   Future<void> _fetchLocation() async {
@@ -109,6 +142,7 @@ class _MapScreenState extends State<MapScreen> {
       _loadingLocation = false;
     });
     _mapController.move(myLatLng, 15.5);
+    _loadStationsAndBuses(position.latitude, position.longitude);
   }
 
   Future<void> _moveToMyLocation() async {
@@ -130,12 +164,6 @@ class _MapScreenState extends State<MapScreen> {
       );
 
   @override
-  void dispose() {
-    _mapController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
@@ -153,37 +181,30 @@ class _MapScreenState extends State<MapScreen> {
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.example.mobile',
             ),
-            // 데모 경로 폴리라인
-            PolylineLayer(
-              polylines: [
-                Polyline(
-                  points: _kRoutePoints,
-                  color: const Color(0xFFF28F3B),
-                  strokeWidth: 4.5,
-                  strokeCap: StrokeCap.round,
-                  strokeJoin: StrokeJoin.round,
-                ),
-              ],
-            ),
             // 정류장 마커
             MarkerLayer(
               markers: [
-                for (final s in _kStations)
-                  Marker(
-                    point: s.position,
-                    width: 90,
-                    height: 68,
-                    child: GestureDetector(
-                      onTap: () {
-                        final station = DemoData.nearbyStations.firstWhere(
-                          (st) => st.name.startsWith(s.name.substring(0, 4)),
-                          orElse: () => DemoData.nearbyStations.first,
-                        );
-                        setState(() => _selectedStation = station);
-                        _mapController.move(s.position, 16);
-                      },
-                      child: _StationMarker(name: s.name, icon: s.icon),
+                for (final s in _nearbyStations)
+                  if (s.latitude != null && s.longitude != null)
+                    Marker(
+                      point: LatLng(s.latitude!, s.longitude!),
+                      width: 90,
+                      height: 68,
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() => _selectedStation = s);
+                          _mapController.move(LatLng(s.latitude!, s.longitude!), 16);
+                        },
+                        child: _StationMarker(name: s.name, icon: Icons.directions_bus_rounded),
+                      ),
                     ),
+                // 버스 위치 마커
+                for (final bus in _busLocations)
+                  Marker(
+                    point: LatLng(bus.latitude, bus.longitude),
+                    width: 64,
+                    height: 48,
+                    child: _BusMarker(routeName: bus.routeName),
                   ),
                 // 내 위치 마커
                 if (_myLocation != null)
@@ -197,6 +218,25 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ],
         ),
+
+        // 정류장 로딩 인디케이터
+        if (_loadingStations)
+          const Positioned(
+            top: 16,
+            right: 16,
+            child: Material(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+              elevation: 3,
+              child: Padding(
+                padding: EdgeInsets.all(10),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+          ),
 
         // ── 우측 버튼 패널 ────────────────────────────────────
         Positioned(
@@ -276,10 +316,12 @@ class _MapScreenState extends State<MapScreen> {
           left: 0,
           right: 0,
           child: _StationBottomPanel(
-            stations: DemoData.nearbyStations,
-            onTap: (station, index) {
+            stations: _nearbyStations,
+            onTap: (station, _) {
               setState(() => _selectedStation = station);
-              _mapController.move(_kStations[index % _kStations.length].position, 16);
+              if (station.latitude != null && station.longitude != null) {
+                _mapController.move(LatLng(station.latitude!, station.longitude!), 16);
+              }
             },
           ),
         ),
@@ -289,17 +331,6 @@ class _MapScreenState extends State<MapScreen> {
 }
 
 // ── 위젯 ──────────────────────────────────────────────────────
-
-class _StationData {
-  const _StationData({
-    required this.name,
-    required this.position,
-    required this.icon,
-  });
-  final String name;
-  final LatLng position;
-  final IconData icon;
-}
 
 class _StationMarker extends StatelessWidget {
   const _StationMarker({required this.name, required this.icon});
@@ -365,6 +396,44 @@ class _MyLocationMarker extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _BusMarker extends StatelessWidget {
+  const _BusMarker({required this.routeName});
+  final String routeName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF28F3B),
+            shape: BoxShape.circle,
+            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+          ),
+          child: const Icon(Icons.directions_bus_filled_rounded,
+              color: Colors.white, size: 14),
+        ),
+        const SizedBox(height: 2),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF28F3B),
+            borderRadius: BorderRadius.circular(99),
+          ),
+          child: Text(
+            routeName,
+            style: const TextStyle(
+                fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }
