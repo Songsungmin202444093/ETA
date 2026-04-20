@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/data/demo_data.dart';
 import '../../../core/models/bus_eta_models.dart';
+import '../../../core/services/location_service.dart';
+import '../../../core/services/notification_service.dart';
 
 // 인하대 주변 데모 좌표 (실제 주소 기반 근사치)
 const _kDefaultCenter = LatLng(37.4502, 126.6571);
@@ -45,14 +48,75 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final _mapController = MapController();
 
-  // GPS-ready 구조: 나중에 geolocator StreamSubscription<Position>으로 교체.
-  // 현재는 버튼을 누르면 기본 좌표를 내 위치로 가정함.
   LatLng? _myLocation;
   NearbyStation? _selectedStation;
+  bool _loadingLocation = false;
+  String? _locationError;
 
-  void _moveToMyLocation() {
-    setState(() => _myLocation = _kDefaultCenter);
-    _mapController.move(_kDefaultCenter, 15.5);
+  @override
+  void initState() {
+    super.initState();
+    // 자동 위치 요청은 생략 — 사용자가 "내 위치" 버튼을 누를 때 실행
+  }
+
+  Future<void> _fetchLocation() async {
+    setState(() {
+      _loadingLocation = true;
+      _locationError = null;
+    });
+
+    final status = await LocationService.instance.checkStatus();
+
+    if (status == LocationStatus.denied || status == LocationStatus.unknown) {
+      final requested = await LocationService.instance.requestPermission();
+      if (requested != LocationStatus.granted) {
+        if (mounted) {
+          setState(() {
+            _loadingLocation = false;
+            _locationError = status == LocationStatus.deniedForever
+                ? '위치 권한이 영구 거부되었습니다.\n설정 앱에서 권한을 허용해 주세요.'
+                : '위치 권한이 없어 현재 위치를 표시할 수 없습니다.';
+          });
+        }
+        return;
+      }
+    }
+
+    if (status == LocationStatus.deniedForever) {
+      if (mounted) {
+        setState(() {
+          _loadingLocation = false;
+          _locationError = '위치 권한이 영구 거부되었습니다.\n설정 앱에서 권한을 허용해 주세요.';
+        });
+      }
+      return;
+    }
+
+    final position = await LocationService.instance.getCurrentPosition();
+    if (!mounted) return;
+
+    if (position == null) {
+      setState(() {
+        _loadingLocation = false;
+        _locationError = 'GPS 신호를 찾을 수 없습니다.\n잠시 후 다시 시도해 주세요.';
+      });
+      return;
+    }
+
+    final myLatLng = LatLng(position.latitude, position.longitude);
+    setState(() {
+      _myLocation = myLatLng;
+      _loadingLocation = false;
+    });
+    _mapController.move(myLatLng, 15.5);
+  }
+
+  Future<void> _moveToMyLocation() async {
+    if (_myLocation != null) {
+      _mapController.move(_myLocation!, 15.5);
+      return;
+    }
+    await _fetchLocation();
   }
 
   void _zoomIn() => _mapController.move(
@@ -157,6 +221,7 @@ class _MapScreenState extends State<MapScreen> {
                 tooltip: '내 위치',
                 onTap: _moveToMyLocation,
                 highlighted: _myLocation != null,
+                loading: _loadingLocation,
               ),
             ],
           ),
@@ -171,6 +236,37 @@ class _MapScreenState extends State<MapScreen> {
             child: _StationPopup(
               station: _selectedStation!,
               onClose: () => setState(() => _selectedStation = null),
+            ),
+          ),
+
+        // ── 위치 오류 배너 ────────────────────────────────────
+        if (_locationError != null && _selectedStation == null)
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Material(
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.orange.shade50,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_off_rounded, color: Colors.orange.shade700, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _locationError!,
+                        style: TextStyle(color: Colors.orange.shade800, fontSize: 13),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _fetchLocation,
+                      child: const Text('재시도'),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
 
@@ -279,11 +375,13 @@ class _MapButton extends StatelessWidget {
     required this.tooltip,
     required this.onTap,
     this.highlighted = false,
+    this.loading = false,
   });
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
   final bool highlighted;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -292,18 +390,26 @@ class _MapButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       elevation: 3,
       child: InkWell(
-        onTap: onTap,
+        onTap: loading ? null : onTap,
         borderRadius: BorderRadius.circular(12),
         child: Tooltip(
           message: tooltip,
           child: SizedBox(
             width: 44,
             height: 44,
-            child: Icon(
-              icon,
-              size: 22,
-              color: highlighted ? Colors.white : const Color(0xFF163B59),
-            ),
+            child: loading
+                ? const Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : Icon(
+                    icon,
+                    size: 22,
+                    color: highlighted ? Colors.white : const Color(0xFF163B59),
+                  ),
           ),
         ),
       ),
@@ -355,17 +461,63 @@ class _StationPopup extends StatelessWidget {
               runSpacing: 6,
               children: station.arrivals
                   .map(
-                    (a) => Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0F8FF),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '${a.line}번 · ${a.arrivalMinutes}분 후',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 13),
+                    (a) => GestureDetector(
+                      onTap: () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: Text('${a.line}번 버스 알림'),
+                            content: Text(
+                              '${station.name} 정류장에 ${a.line}번이\n'
+                              '약 ${a.arrivalMinutes}분 후 도착합니다.\n\n1분 전 알림을 받을까요?',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text('취소'),
+                              ),
+                              FilledButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('알림 설정'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed != true || !context.mounted) return;
+                        await NotificationService.instance.scheduleArrivalAlert(
+                          id: a.line.hashCode ^ station.name.hashCode,
+                          stationName: station.name,
+                          line: a.line,
+                          arrivalMinutes: a.arrivalMinutes,
+                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${a.line}번 버스 알림이 설정되었습니다.'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F8FF),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${a.line}번 · ${a.arrivalMinutes}분 후',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.notifications_none_rounded, size: 13),
+                          ],
+                        ),
                       ),
                     ),
                   )
