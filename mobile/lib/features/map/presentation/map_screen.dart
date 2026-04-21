@@ -1,9 +1,7 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 
 import '../../../core/models/bus_eta_models.dart';
 import '../../../core/services/bus_arrival_service.dart';
@@ -12,8 +10,9 @@ import '../../../core/services/bus_stop_service.dart';
 import '../../../core/services/location_service.dart';
 import '../../../core/services/notification_service.dart';
 
-// 경기도 수원시 기본 중심 (API 데이터가 없을 때 폴백)
-const _kDefaultCenter = LatLng(37.2636, 127.0286);
+const _kDefaultLat = 37.2636;
+const _kDefaultLng = 127.0286;
+const _kDefaultLevel = 4;
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -23,7 +22,8 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  final _mapController = MapController();
+  KakaoMapController? _mapController;
+  int _currentLevel = _kDefaultLevel;
 
   LatLng? _myLocation;
   NearbyStation? _selectedStation;
@@ -43,16 +43,70 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
-    _mapController.dispose();
     super.dispose();
+  }
+
+  List<Marker> _buildMarkers() {
+    final markers = <Marker>[];
+    for (final s in _nearbyStations) {
+      if (s.latitude == null || s.longitude == null) continue;
+      final shortName = s.name.split('.').first;
+      markers.add(Marker(
+        markerId: 'station_${s.stationId ?? s.name}',
+        latLng: LatLng(s.latitude!, s.longitude!),
+        width: 28,
+        height: 28,
+        infoWindowContent:
+            '<div style="padding:4px 8px;background:#163B59;color:white;border-radius:6px;font-size:12px;font-weight:bold;white-space:nowrap;">$shortName</div>',
+        infoWindowFirstShow: false,
+        infoWindowRemovable: true,
+        zIndex: 5,
+      ));
+    }
+    for (int i = 0; i < _busLocations.length; i++) {
+      final bus = _busLocations[i];
+      markers.add(Marker(
+        markerId: 'bus_${bus.routeId}_$i',
+        latLng: LatLng(bus.latitude, bus.longitude),
+        width: 22,
+        height: 22,
+        zIndex: 10,
+      ));
+    }
+    if (_myLocation != null) {
+      markers.add(Marker(
+        markerId: 'my_location',
+        latLng: _myLocation!,
+        width: 20,
+        height: 20,
+        zIndex: 15,
+      ));
+    }
+    return markers;
+  }
+
+  void _updateMapMarkers() {
+    if (_mapController == null) return;
+    _mapController!.clearMarker();
+    _mapController!.addMarker(markers: _buildMarkers());
+  }
+
+  void _onMarkerTap(String markerId, LatLng latLng, int zoomLevel) {
+    if (!markerId.startsWith('station_')) return;
+    final id = markerId.substring('station_'.length);
+    final station = _nearbyStations.cast<NearbyStation?>().firstWhere(
+      (s) => (s!.stationId ?? s.name) == id,
+      orElse: () => null,
+    );
+    if (station != null && mounted) {
+      setState(() => _selectedStation = station);
+    }
   }
 
   Future<void> _loadStationsAndBuses(double lat, double lng) async {
     if (mounted) setState(() => _loadingStations = true);
     try {
       final stations = await BusStopService.instance.getNearbyStations(lat, lng);
-
-      // 최대 5개 정류소 도착정보 병렬 조회
       final withArrivals = await Future.wait(
         stations.take(5).map((s) async {
           if (s.stationId == null || s.stationId!.isEmpty) return s;
@@ -64,17 +118,13 @@ class _MapScreenState extends State<MapScreen> {
           }
         }),
       );
-
       if (!mounted) return;
       setState(() {
         _nearbyStations = withArrivals;
         _loadingStations = false;
       });
-
-      // 모든 노선의 버스 위치 조회
+      _updateMapMarkers();
       _refreshBusLocations();
-
-      // 30초마다 버스 위치 자동 갱신
       _refreshTimer?.cancel();
       _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
         if (mounted) _refreshBusLocations();
@@ -88,7 +138,10 @@ class _MapScreenState extends State<MapScreen> {
     final allArrivals = _nearbyStations.expand((s) => s.arrivals).toList();
     try {
       final locs = await BusLocationService.instance.getBusLocationsForRoutes(allArrivals);
-      if (mounted) setState(() => _busLocations = locs);
+      if (mounted) {
+        setState(() => _busLocations = locs);
+        _updateMapMarkers();
+      }
     } catch (_) {}
   }
 
@@ -97,9 +150,7 @@ class _MapScreenState extends State<MapScreen> {
       _loadingLocation = true;
       _locationError = null;
     });
-
     final status = await LocationService.instance.checkStatus();
-
     if (status == LocationStatus.denied || status == LocationStatus.unknown) {
       final requested = await LocationService.instance.requestPermission();
       if (requested != LocationStatus.granted) {
@@ -114,7 +165,6 @@ class _MapScreenState extends State<MapScreen> {
         return;
       }
     }
-
     if (status == LocationStatus.deniedForever) {
       if (mounted) {
         setState(() {
@@ -124,10 +174,8 @@ class _MapScreenState extends State<MapScreen> {
       }
       return;
     }
-
     final position = await LocationService.instance.getCurrentPosition();
     if (!mounted) return;
-
     if (position == null) {
       setState(() {
         _loadingLocation = false;
@@ -135,93 +183,56 @@ class _MapScreenState extends State<MapScreen> {
       });
       return;
     }
-
     final myLatLng = LatLng(position.latitude, position.longitude);
     setState(() {
       _myLocation = myLatLng;
       _loadingLocation = false;
     });
-    _mapController.move(myLatLng, 15.5);
+    _mapController?.panTo(myLatLng);
+    _mapController?.setLevel(3);
+    _updateMapMarkers();
     _loadStationsAndBuses(position.latitude, position.longitude);
   }
 
   Future<void> _moveToMyLocation() async {
     if (_myLocation != null) {
-      _mapController.move(_myLocation!, 15.5);
+      _mapController?.panTo(_myLocation!);
+      _mapController?.setLevel(3);
       return;
     }
     await _fetchLocation();
   }
 
-  void _zoomIn() => _mapController.move(
-        _mapController.camera.center,
-        _mapController.camera.zoom + 1,
-      );
+  void _zoomIn() {
+    if (_currentLevel > 1) {
+      final newLevel = _currentLevel - 1;
+      _mapController?.setLevel(newLevel);
+      setState(() => _currentLevel = newLevel);
+    }
+  }
 
-  void _zoomOut() => _mapController.move(
-        _mapController.camera.center,
-        _mapController.camera.zoom - 1,
-      );
+  void _zoomOut() {
+    if (_currentLevel < 14) {
+      final newLevel = _currentLevel + 1;
+      _mapController?.setLevel(newLevel);
+      setState(() => _currentLevel = newLevel);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // ── 지도 ──────────────────────────────────────────────
-        FlutterMap(
-          mapController: _mapController,
-          options: const MapOptions(
-            initialCenter: _kDefaultCenter,
-            initialZoom: 15.0,
-            minZoom: 10,
-            maxZoom: 18,
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.example.mobile',
-            ),
-            // 정류장 마커
-            MarkerLayer(
-              markers: [
-                for (final s in _nearbyStations)
-                  if (s.latitude != null && s.longitude != null)
-                    Marker(
-                      point: LatLng(s.latitude!, s.longitude!),
-                      width: 80,
-                      height: 72,
-                      alignment: Alignment.bottomCenter,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          setState(() => _selectedStation = s);
-                          _mapController.move(LatLng(s.latitude!, s.longitude!), 16);
-                        },
-                        child: _StationMarker(name: s.name),
-                      ),
-                    ),
-                // 버스 위치 마커
-                for (final bus in _busLocations)
-                  Marker(
-                    point: LatLng(bus.latitude, bus.longitude),
-                    width: 64,
-                    height: 48,
-                    child: _BusMarker(routeName: bus.routeName),
-                  ),
-                // 내 위치 마커
-                if (_myLocation != null)
-                  Marker(
-                    point: _myLocation!,
-                    width: 56,
-                    height: 56,
-                    child: const _MyLocationMarker(),
-                  ),
-              ],
-            ),
-          ],
+        KakaoMap(
+          onMapCreated: (controller) {
+            _mapController = controller;
+            _fetchLocation();
+          },
+          onMarkerTap: _onMarkerTap,
+          onZoomChangeCallback: (level, _) => _currentLevel = level,
+          center: LatLng(_kDefaultLat, _kDefaultLng),
+          currentLevel: _kDefaultLevel,
         ),
-
-        // 정류장 로딩 인디케이터
         if (_loadingStations)
           const Positioned(
             top: 16,
@@ -239,24 +250,14 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           ),
-
-        // ── 우측 버튼 패널 ────────────────────────────────────
         Positioned(
           right: 16,
           bottom: 220,
           child: Column(
             children: [
-              _MapButton(
-                icon: Icons.add,
-                tooltip: '확대',
-                onTap: _zoomIn,
-              ),
+              _MapButton(icon: Icons.add, tooltip: '확대', onTap: _zoomIn),
               const SizedBox(height: 8),
-              _MapButton(
-                icon: Icons.remove,
-                tooltip: '축소',
-                onTap: _zoomOut,
-              ),
+              _MapButton(icon: Icons.remove, tooltip: '축소', onTap: _zoomOut),
               const SizedBox(height: 8),
               _MapButton(
                 icon: Icons.my_location_rounded,
@@ -268,8 +269,6 @@ class _MapScreenState extends State<MapScreen> {
             ],
           ),
         ),
-
-        // ── 선택된 정류장 팝업 ─────────────────────────────────
         if (_selectedStation != null)
           Positioned(
             top: 16,
@@ -280,8 +279,6 @@ class _MapScreenState extends State<MapScreen> {
               onClose: () => setState(() => _selectedStation = null),
             ),
           ),
-
-        // ── 위치 오류 배너 ────────────────────────────────────
         if (_locationError != null && _selectedStation == null)
           Positioned(
             top: 16,
@@ -302,17 +299,12 @@ class _MapScreenState extends State<MapScreen> {
                         style: TextStyle(color: Colors.orange.shade800, fontSize: 13),
                       ),
                     ),
-                    TextButton(
-                      onPressed: _fetchLocation,
-                      child: const Text('재시도'),
-                    ),
+                    TextButton(onPressed: _fetchLocation, child: const Text('재시도')),
                   ],
                 ),
               ),
             ),
           ),
-
-        // ── 하단 정류장 목록 패널 ─────────────────────────────
         Positioned(
           bottom: 0,
           left: 0,
@@ -322,121 +314,10 @@ class _MapScreenState extends State<MapScreen> {
             onTap: (station, _) {
               setState(() => _selectedStation = station);
               if (station.latitude != null && station.longitude != null) {
-                _mapController.move(LatLng(station.latitude!, station.longitude!), 16);
+                _mapController?.panTo(LatLng(station.latitude!, station.longitude!));
+                _mapController?.setLevel(3);
               }
             },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── 위젯 ──────────────────────────────────────────────────────
-
-class _StationMarker extends StatelessWidget {
-  const _StationMarker({required this.name});
-  final String name;
-
-  /// '.' 기준 첫 번째 의미 단위만 표시 (예: "인계동행정복지센터.KBS…" → "인계동행정복지센터")
-  String get _shortName => name.split('.').first;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
-            border: Border.all(color: Color(0xFF163B59), width: 1),
-          ),
-          child: Text(
-            _shortName,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF163B59),
-            ),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Container(
-          width: 32,
-          height: 32,
-          decoration: const BoxDecoration(
-            color: Color(0xFF163B59),
-            shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 6, offset: Offset(0, 2))],
-          ),
-          child: const Icon(Icons.directions_bus_filled_rounded, color: Colors.white, size: 18),
-        ),
-      ],
-    );
-  }
-}
-
-class _MyLocationMarker extends StatelessWidget {
-  const _MyLocationMarker();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF2C8C99).withValues(alpha: 0.2),
-        shape: BoxShape.circle,
-      ),
-      child: Center(
-        child: Container(
-          width: 20,
-          height: 20,
-          decoration: BoxDecoration(
-            color: const Color(0xFF2C8C99),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 3),
-            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BusMarker extends StatelessWidget {
-  const _BusMarker({required this.routeName});
-  final String routeName;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF28F3B),
-            shape: BoxShape.circle,
-            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
-          ),
-          child: const Icon(Icons.directions_bus_filled_rounded,
-              color: Colors.white, size: 14),
-        ),
-        const SizedBox(height: 2),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF28F3B),
-            borderRadius: BorderRadius.circular(99),
-          ),
-          child: Text(
-            routeName,
-            style: const TextStyle(
-                fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
-            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -473,18 +354,8 @@ class _MapButton extends StatelessWidget {
             width: 44,
             height: 44,
             child: loading
-                ? const Center(
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : Icon(
-                    icon,
-                    size: 22,
-                    color: highlighted ? Colors.white : const Color(0xFF163B59),
-                  ),
+                ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                : Icon(icon, size: 22, color: highlighted ? Colors.white : const Color(0xFF163B59)),
           ),
         ),
       ),
@@ -511,12 +382,7 @@ class _StationPopup extends StatelessWidget {
               children: [
                 const Icon(Icons.place_rounded, color: Color(0xFF163B59)),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    station.name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
+                Expanded(child: Text(station.name, style: Theme.of(context).textTheme.titleMedium)),
                 IconButton(
                   onPressed: onClose,
                   icon: const Icon(Icons.close_rounded),
@@ -526,77 +392,51 @@ class _StationPopup extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            Text(
-              '${station.distanceMeters}m · ${station.lines.join(' · ')}',
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
-            ),
+            Text('${station.distanceMeters}m · ${station.lines.join(' · ')}',
+                style: const TextStyle(color: Colors.grey, fontSize: 13)),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
               runSpacing: 6,
-              children: station.arrivals
-                  .map(
-                    (a) => GestureDetector(
-                      onTap: () async {
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: Text('${a.line}번 버스 알림'),
-                            content: Text(
-                              '${station.name} 정류장에 ${a.line}번이\n'
-                              '약 ${a.arrivalMinutes}분 후 도착합니다.\n\n1분 전 알림을 받을까요?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('취소'),
-                              ),
-                              FilledButton(
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('알림 설정'),
-                              ),
-                            ],
-                          ),
-                        );
-                        if (confirmed != true || !context.mounted) return;
-                        await NotificationService.instance.scheduleArrivalAlert(
-                          id: a.line.hashCode ^ station.name.hashCode,
-                          stationName: station.name,
-                          line: a.line,
-                          arrivalMinutes: a.arrivalMinutes,
-                        );
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('${a.line}번 버스 알림이 설정되었습니다.'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F8FF),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${a.line}번 · ${a.arrivalMinutes}분 후',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600, fontSize: 13),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.notifications_none_rounded, size: 13),
-                          ],
-                        ),
-                      ),
+              children: station.arrivals.map((a) => GestureDetector(
+                onTap: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: Text('${a.line}번 버스 알림'),
+                      content: Text('${station.name} 정류장에 ${a.line}번이\n약 ${a.arrivalMinutes}분 후 도착합니다.\n\n1분 전 알림을 받을까요?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
+                        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('알림 설정')),
+                      ],
                     ),
-                  )
-                  .toList(),
+                  );
+                  if (confirmed != true || !context.mounted) return;
+                  await NotificationService.instance.scheduleArrivalAlert(
+                    id: a.line.hashCode ^ station.name.hashCode,
+                    stationName: station.name,
+                    line: a.line,
+                    arrivalMinutes: a.arrivalMinutes,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${a.line}번 버스 알림이 설정되었습니다.'), behavior: SnackBarBehavior.floating),
+                    );
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: const Color(0xFFF0F8FF), borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('${a.line}번 · ${a.arrivalMinutes}분 후', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.notifications_none_rounded, size: 13),
+                    ],
+                  ),
+                ),
+              )).toList(),
             ),
           ],
         ),
@@ -606,10 +446,7 @@ class _StationPopup extends StatelessWidget {
 }
 
 class _StationBottomPanel extends StatelessWidget {
-  const _StationBottomPanel({
-    required this.stations,
-    required this.onTap,
-  });
+  const _StationBottomPanel({required this.stations, required this.onTap});
   final List<NearbyStation> stations;
   final void Function(NearbyStation station, int index) onTap;
 
@@ -628,12 +465,8 @@ class _StationBottomPanel extends StatelessWidget {
         children: [
           Center(
             child: Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(99),
-              ),
+              width: 36, height: 4,
+              decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(99)),
             ),
           ),
           const SizedBox(height: 14),
@@ -643,14 +476,8 @@ class _StationBottomPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF163B59),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Text(
-                  '${stations.length}곳',
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                ),
+                decoration: BoxDecoration(color: const Color(0xFF163B59), borderRadius: BorderRadius.circular(99)),
+                child: Text('${stations.length}곳', style: const TextStyle(color: Colors.white, fontSize: 12)),
               ),
             ],
           ),
@@ -666,8 +493,7 @@ class _StationBottomPanel extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 18,
-                      backgroundColor:
-                          const Color(0xFF163B59).withValues(alpha: 0.1),
+                      backgroundColor: const Color(0xFF163B59).withValues(alpha: 0.1),
                       foregroundColor: const Color(0xFF163B59),
                       child: const Icon(Icons.place_outlined, size: 16),
                     ),
@@ -676,14 +502,9 @@ class _StationBottomPanel extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(s.name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600)),
-                          Text(
-                            '${s.distanceMeters}m · ${s.lines.join(' · ')}',
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.grey),
-                          ),
+                          Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Text('${s.distanceMeters}m · ${s.lines.join(' · ')}',
+                              style: const TextStyle(fontSize: 12, color: Colors.grey)),
                         ],
                       ),
                     ),
