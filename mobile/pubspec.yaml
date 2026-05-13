@@ -41,6 +41,16 @@ dependencies:
   http: ^1.2.2
   xml: ^6.5.0
   kakao_map_plugin: ^0.4.0
+  flutter_riverpod: ^2.6.1
+  crypto: ^3.0.6
+  kakao_flutter_sdk_user: ^1.9.3
+  google_sign_in: ^6.2.2
+  flutter_naver_login: ^2.1.0
+
+dependency_overrides:
+  webview_flutter_android: 4.3.0
+  kakao_map_plugin:
+    path: packages/kakao_map_plugin
 
 dev_dependencies:
   flutter_test:

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<title>BusETA Presentation Flow</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:1920px;
+  height:1080px;
+  overflow:hidden;
+  background:#eef4f8;
+  font-family:"Malgun Gothic","Segoe UI",sans-serif;
+}
+</style>
+</head>
+<body>
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f7fbff"/>
+      <stop offset="100%" stop-color="#eef3f7"/>
+    </linearGradient>
+    <linearGradient id="busHead" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <linearGradient id="loginHead" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#db2777"/>
+    </linearGradient>
+    <linearGradient id="busCard" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#eff6ff"/>
+      <stop offset="100%" stop-color="#dbeafe"/>
+    </linearGradient>
+    <linearGradient id="loginCard" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#faf5ff"/>
+      <stop offset="100%" stop-color="#f3e8ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#0f172a18"/>
+    </filter>
+    <marker id="arrowBus" markerWidth="12" markerHeight="12" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L11,4 z" fill="#0284c7"/>
+    </marker>
+    <marker id="arrowLogin" markerWidth="12" markerHeight="12" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L11,4 z" fill="#9333ea"/>
+    </marker>
+    <marker id="arrowGray" markerWidth="12" markerHeight="12" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L11,4 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <circle cx="176" cy="140" r="120" fill="#dbeafe" opacity="0.8"/>
+  <circle cx="1770" cy="160" r="140" fill="#f5d0fe" opacity="0.6"/>
+  <circle cx="1820" cy="930" r="170" fill="#bfdbfe" opacity="0.35"/>
+
+  <rect x="60" y="42" width="1800" height="104" rx="30" fill="#ffffff" filter="url(#shadow)"/>
+  <text x="960" y="88" text-anchor="middle" fill="#0f172a" font-size="34" font-weight="700">BusETA 발표용 데이터 플로우</text>
+  <text x="960" y="122" text-anchor="middle" fill="#475569" font-size="18">실시간 버스 조회와 소셜 로그인의 핵심 흐름을 한 장에 정리</text>
+
+  <rect x="70" y="180" width="850" height="840" rx="34" fill="#ffffff" filter="url(#shadow)"/>
+  <rect x="1000" y="180" width="850" height="840" rx="34" fill="#ffffff" filter="url(#shadow)"/>
+
+  <rect x="70" y="180" width="850" height="92" rx="34" fill="url(#busHead)"/>
+  <rect x="1000" y="180" width="850" height="92" rx="34" fill="url(#loginHead)"/>
+  <text x="495" y="233" text-anchor="middle" fill="#ffffff" font-size="28" font-weight="700">버스 정보 조회 흐름</text>
+  <text x="495" y="256" text-anchor="middle" fill="#dbeafe" font-size="14">정류소 탐색, 도착예정, 버스 위치가 연결되는 구조</text>
+  <text x="1425" y="233" text-anchor="middle" fill="#ffffff" font-size="28" font-weight="700">소셜 로그인 흐름</text>
+  <text x="1425" y="256" text-anchor="middle" fill="#f5d0fe" font-size="14">카카오, 구글, 네이버 인증 후 세션 저장까지</text>
+
+  <rect x="110" y="310" width="110" height="34" rx="17" fill="#dbeafe"/>
+  <text x="165" y="333" text-anchor="middle" fill="#1d4ed8" font-size="15" font-weight="700">BUS FLOW</text>
+  <rect x="1040" y="310" width="130" height="34" rx="17" fill="#f3e8ff"/>
+  <text x="1105" y="333" text-anchor="middle" fill="#7c3aed" font-size="15" font-weight="700">LOGIN FLOW</text>
+
+  <rect x="276" y="320" width="440" height="86" rx="28" fill="url(#busCard)" stroke="#93c5fd" stroke-width="2"/>
+  <text x="496" y="357" text-anchor="middle" fill="#0f172a" font-size="24" font-weight="700">1. 사용자가 화면 진입</text>
+  <text x="496" y="384" text-anchor="middle" fill="#334155" font-size="15">지도 또는 홈에서 버스 확인을 시작</text>
+  <rect x="1168" y="320" width="440" height="86" rx="28" fill="url(#loginCard)" stroke="#d8b4fe" stroke-width="2"/>
+  <text x="1388" y="357" text-anchor="middle" fill="#0f172a" font-size="24" font-weight="700">1. 로그인 버튼 선택</text>
+  <text x="1388" y="384" text-anchor="middle" fill="#334155" font-size="15">카카오, 구글, 네이버 중 하나를 누름</text>
+
+  <line x1="496" y1="406" x2="496" y2="468" stroke="#64748b" stroke-width="3" marker-end="url(#arrowGray)"/>
+  <line x1="1388" y1="406" x2="1388" y2="468" stroke="#64748b" stroke-width="3" marker-end="url(#arrowGray)"/>
+  <text x="736" y="438" text-anchor="start" fill="#0369a1" font-size="15" font-weight="700">GPS 기반 탐색 시작</text>
+  <text x="1620" y="438" text-anchor="start" fill="#7e22ce" font-size="15" font-weight="700">소셜 인증 화면 연결</text>
+
+  <rect x="276" y="486" width="440" height="88" rx="28" fill="#ffffff" stroke="#7dd3fc" stroke-width="2"/>
+  <text x="496" y="524" text-anchor="middle" fill="#0f172a" font-size="24" font-weight="700">2. 위치와 정류소 탐색</text>
+  <text x="496" y="551" text-anchor="middle" fill="#334155" font-size="15">GPS 좌표를 얻고 주변 정류소 목록을 요청</text>
+  <rect x="1168" y="486" width="440" height="88" rx="28" fill="#ffffff" stroke="#d8b4fe" stroke-width="2"/>
+  <text x="1388" y="524" text-anchor="middle" fill="#0f172a" font-size="24" font-weight="700">2. 인증 서버에서 본인 확인</text>
+  <text x="1388" y="551" text-anchor="middle" fill="#334155" font-size="15">서비스 서버가 사용자를 확인하고 토큰을 발급</text>
+
+  <line x1="496" y1="574" x2="496" y2="628" stroke="#0284c7" stroke-width="4" marker-end="url(#arrowBus)"/>
+  <line x1="1388" y1="574" x2="1388" y2="628" stroke="#9333ea" stroke-width="4" marker-end="url(#arrowLogin)"/>
+
+  <rect x="128" y="648" width="286" height="104" rx="28" fill="#ecfeff" stroke="#67e8f9" stroke-width="2"/>
+  <text x="271" y="691" text-anchor="middle" fill="#0f172a" font-size="22" font-weight="700">도착 예정 시간</text>
+  <text x="271" y="720" text-anchor="middle" fill="#0f766e" font-size="15">몇 분 후 도착하는지 안내</text>
+  <rect x="578" y="648" width="286" height="104" rx="28" fill="#ecfdf5" stroke="#86efac" stroke-width="2"/>
+  <text x="721" y="691" text-anchor="middle" fill="#0f172a" font-size="22" font-weight="700">버스 현재 위치</text>
+  <text x="721" y="720" text-anchor="middle" fill="#166534" font-size="15">지도 위 핀으로 현재 위치 표시</text>
+
+  <rect x="1018" y="632" width="250" height="112" rx="28" fill="#fff7ed" stroke="#fdba74" stroke-width="2"/>
+  <text x="1143" y="676" text-anchor="middle" fill="#0f172a" font-size="21" font-weight="700">카카오</text>
+  <text x="1143" y="706" text-anchor="middle" fill="#92400e" font-size="15">카카오 계정 인증 완료</text>
+  <rect x="1298" y="632" width="250" height="112" rx="28" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="1423" y="676" text-anchor="middle" fill="#0f172a" font-size="21" font-weight="700">구글</text>
+  <text x="1423" y="706" text-anchor="middle" fill="#475569" font-size="15">구글 계정 인증 완료</text>
+  <rect x="1578" y="632" width="250" height="112" rx="28" fill="#f0fdf4" stroke="#86efac" stroke-width="2"/>
+  <text x="1703" y="676" text-anchor="middle" fill="#0f172a" font-size="21" font-weight="700">네이버</text>
+  <text x="1703" y="706" text-anchor="middle" fill="#166534" font-size="15">네이버 계정 인증 완료</text>
+
+  <line x1="271" y1="752" x2="426" y2="822" stroke="#0891b2" stroke-width="4" marker-end="url(#arrowBus)"/>
+  <line x1="721" y1="752" x2="566" y2="822" stroke="#16a34a" stroke-width="4" marker-end="url(#arrowBus)"/>
+  <line x1="1143" y1="744" x2="1296" y2="822" stroke="#a855f7" stroke-width="4" marker-end="url(#arrowLogin)"/>
+  <line x1="1423" y1="744" x2="1423" y2="822" stroke="#a855f7" stroke-width="4" marker-end="url(#arrowLogin)"/>
+  <line x1="1703" y1="744" x2="1550" y2="822" stroke="#a855f7" stroke-width="4" marker-end="url(#arrowLogin)"/>
+  <text x="128" y="790" text-anchor="start" fill="#0369a1" font-size="15" font-weight="700">도착 정보와 위치 정보를 결합</text>
+  <text x="1620" y="790" text-anchor="start" fill="#7e22ce" font-size="15" font-weight="700">인증 결과를 세션으로 통합</text>
+
+  <rect x="288" y="840" width="416" height="104" rx="30" fill="#0f766e"/>
+  <text x="496" y="884" text-anchor="middle" fill="#ffffff" font-size="24" font-weight="700">3. 앱 화면에 실시간 결과 표시</text>
+  <text x="496" y="915" text-anchor="middle" fill="#ccfbf1" font-size="15">도착시간과 버스 위치를 함께 보여줌</text>
+
+  <rect x="1180" y="840" width="416" height="104" rx="30" fill="#7c3aed"/>
+  <text x="1388" y="884" text-anchor="middle" fill="#ffffff" font-size="24" font-weight="700">3. 로그인 상태 저장 후 완료</text>
+  <text x="1388" y="915" text-anchor="middle" fill="#ede9fe" font-size="15">앱을 다시 켜도 자동 로그인 유지</text>
+
+  <rect x="116" y="958" width="760" height="42" rx="21" fill="#e0f2fe"/>
+  <text x="496" y="985" text-anchor="middle" fill="#075985" font-size="16" font-weight="700">핵심: 사용자는 버튼 한 번으로 버스 상태를 즉시 확인</text>
+  <rect x="1046" y="958" width="760" height="42" rx="21" fill="#f3e8ff"/>
+  <text x="1426" y="985" text-anchor="middle" fill="#7e22ce" font-size="16" font-weight="700">핵심: 인증이 끝나면 세션을 저장해 다음 실행도 유지</text>
+
+  <text x="960" y="1044" text-anchor="middle" fill="#94a3b8" font-size="14">BusETA | Copilot presentation style | 1920 x 1080</text>
+</svg>
+</body>
+</html>

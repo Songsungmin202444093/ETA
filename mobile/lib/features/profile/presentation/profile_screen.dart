@@ -1,20 +1,51 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_theme.dart';
+import '../../auth/data/local_auth_repository.dart';
 import '../../auth/presentation/login_screen.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../auth/providers/auth_state.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  final _nameController = TextEditingController(text: '홍길동');
-  final _emailController = TextEditingController(text: 'user@example.com');
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
   bool _editing = false;
+  String? _currentEmail;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    // Riverpod 상태에서 현재 사용자 로드
+    final authState = ref.read(authProvider);
+    if (authState is AuthAuthenticated) {
+      setState(() {
+        _currentEmail = authState.user.email;
+        _nameController.text = authState.user.name;
+        _emailController.text = authState.user.email;
+      });
+      return;
+    }
+    // 혹시 상태가 없으면 레포지토리에서 직접 로드
+    final user = await LocalAuthRepository.instance.getCurrentUser();
+    if (!mounted || user == null) return;
+    setState(() {
+      _currentEmail = user.email;
+      _nameController.text = user.name;
+      _emailController.text = user.email;
+    });
+  }
 
   @override
   void dispose() {
@@ -43,8 +74,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auto_login');
+    await ref.read(authProvider.notifier).logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -52,8 +82,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _saveProfile() {
-    setState(() => _editing = false);
+  Future<void> _saveProfile() async {
+    final currentEmail = _currentEmail;
+    if (currentEmail == null) return;
+
+    final result = await ref.read(authProvider.notifier).updateProfile(
+      currentEmail: currentEmail,
+      name: _nameController.text,
+      email: _emailController.text,
+    );
+
+    if (!mounted) return;
+    if (!result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.errorMessage!)),
+      );
+      return;
+    }
+
+    setState(() {
+      _editing = false;
+      _currentEmail = result.user!.email;
+      _emailController.text = result.user!.email;
+      _nameController.text = result.user!.name;
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('프로필이 저장되었습니다.')),
     );
@@ -119,15 +171,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 32),
 
-          // 비밀번호 변경
-          _ActionTile(
-            icon: Icons.lock_outline_rounded,
-            label: '비밀번호 변경',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const _ChangePasswordScreen()),
+          // 비밀번호 변경 (로컬 계정만 표시)
+          if (ref.watch(authProvider) is AuthAuthenticated &&
+              !(ref.watch(authProvider) as AuthAuthenticated).user.isSocialUser)
+            _ActionTile(
+              icon: Icons.lock_outline_rounded,
+              label: '비밀번호 변경',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const _ChangePasswordScreen()),
+              ),
             ),
-          ),
           const SizedBox(height: 32),
 
           // 로그아웃
@@ -243,9 +297,33 @@ class _ChangePasswordScreenState extends State<_ChangePasswordScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
+
+    final user = await LocalAuthRepository.instance.getCurrentUser();
+    if (user == null) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('다시 로그인한 뒤 시도해 주세요.')),
+      );
+      return;
+    }
+
+    final result = await LocalAuthRepository.instance.changePassword(
+      email: user.email,
+      currentPassword: _currentCtrl.text,
+      newPassword: _newCtrl.text,
+    );
+
     if (!mounted) return;
     setState(() => _loading = false);
+
+    if (!result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.errorMessage!)),
+      );
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('비밀번호가 변경되었습니다.')),
     );

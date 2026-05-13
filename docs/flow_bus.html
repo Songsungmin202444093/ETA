@@ -1,0 +1,87 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"/><title>BusETA 버스 플로우</title>
+<style>* { margin:0; padding:0; box-sizing:border-box; } html,body { width:960px; height:1080px; background:#f0f4f8; overflow:hidden; font-family:"Malgun Gothic","Segoe UI",sans-serif; }</style>
+</head>
+<body>
+<svg width="960" height="1080" viewBox="0 0 960 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3.5" orient="auto"><path d="M0,0 L0,7 L10,3.5 z" fill="#94a3b8"/></marker>
+    <marker id="arr-blue" markerWidth="10" markerHeight="10" refX="8" refY="3.5" orient="auto"><path d="M0,0 L0,7 L10,3.5 z" fill="#3b82f6"/></marker>
+    <marker id="arr-orange" markerWidth="10" markerHeight="10" refX="8" refY="3.5" orient="auto"><path d="M0,0 L0,7 L10,3.5 z" fill="#f97316"/></marker>
+    <marker id="arr-green" markerWidth="10" markerHeight="10" refX="8" refY="3.5" orient="auto"><path d="M0,0 L0,7 L10,3.5 z" fill="#22c55e"/></marker>
+    <filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#00000015"/></filter>
+  </defs>
+
+  <rect width="960" height="1080" fill="#f0f4f8"/>
+
+  <!-- 헤더 -->
+  <rect x="0" y="0" width="960" height="80" fill="#ffffff" filter="url(#shadow)"/>
+  <text x="480" y="32" text-anchor="middle" fill="#1e293b" font-size="24" font-weight="700">🚌 버스 정보 조회 흐름</text>
+  <text x="480" y="62" text-anchor="middle" fill="#64748b" font-size="15">지도·홈 화면에서 버스를 확인하는 과정</text>
+
+  <!-- 패널 배경 -->
+  <rect x="20" y="92" width="920" height="972" rx="24" fill="#ffffff" filter="url(#shadow)"/>
+  <rect x="20" y="92" width="920" height="56" rx="24" fill="#dbeafe"/>
+  <rect x="20" y="128" width="920" height="20" fill="#dbeafe"/>
+  <text x="480" y="126" text-anchor="middle" fill="#1d4ed8" font-size="16" font-weight="700">내가 앱에서 버튼 하나 누를 때 일어나는 일</text>
+
+  <!-- STEP 1: 사용자 -->
+  <rect x="330" y="162" width="300" height="76" rx="16" fill="#1d4ed8" filter="url(#shadow)"/>
+  <text x="480" y="193" text-anchor="middle" fill="#ffffff" font-size="17" font-weight="700">👤  나 (사용자)</text>
+  <text x="480" y="219" text-anchor="middle" fill="#bfdbfe" font-size="14">지도 또는 홈 화면 탭</text>
+  <line x1="480" y1="240" x2="480" y2="278" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="642" y="263" text-anchor="start" fill="#64748b" font-size="13" font-style="italic">① 앱 화면을 연다</text>
+
+  <!-- STEP 2: 위치 파악 -->
+  <rect x="330" y="280" width="300" height="76" rx="16" fill="#0ea5e9" filter="url(#shadow)"/>
+  <text x="480" y="312" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="700">📍  내 위치 파악</text>
+  <text x="480" y="338" text-anchor="middle" fill="#e0f2fe" font-size="13">스마트폰 GPS 사용</text>
+  <line x1="480" y1="358" x2="480" y2="396" stroke="#0ea5e9" stroke-width="2" marker-end="url(#arr-blue)"/>
+  <text x="642" y="381" text-anchor="start" fill="#64748b" font-size="13" font-style="italic">② GPS로 현재 좌표를 얻음</text>
+
+  <!-- STEP 3: 정류소 -->
+  <rect x="330" y="398" width="300" height="76" rx="16" fill="#06b6d4" filter="url(#shadow)"/>
+  <text x="480" y="430" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="700">🏩  근처 정류소 검색</text>
+  <text x="480" y="456" text-anchor="middle" fill="#cffafe" font-size="13">좌표로 주변 정류소 목록 요청</text>
+  <line x1="480" y1="476" x2="480" y2="514" stroke="#06b6d4" stroke-width="2" marker-end="url(#arr-blue)"/>
+  <text x="642" y="499" text-anchor="start" fill="#64748b" font-size="13" font-style="italic">③ 근처 정류소 알려줘</text>
+
+  <!-- STEP 4: API 요청 -->
+  <rect x="330" y="516" width="300" height="64" rx="16" fill="#f97316" filter="url(#shadow)"/>
+  <text x="480" y="544" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="700">🌐  경기도 버스 서버 요청</text>
+  <text x="480" y="566" text-anchor="middle" fill="#fed7aa" font-size="13">공공데이터 API (무료)</text>
+
+  <!-- 두 갈래 -->
+  <line x1="380" y1="582" x2="200" y2="628" stroke="#f97316" stroke-width="2" marker-end="url(#arr-orange)"/>
+  <line x1="580" y1="582" x2="740" y2="628" stroke="#f97316" stroke-width="2" marker-end="url(#arr-orange)"/>
+
+  <rect x="68" y="630" width="264" height="76" rx="16" fill="#16a34a" filter="url(#shadow)"/>
+  <text x="200" y="662" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="700">🕐  도착 예정 시간</text>
+  <text x="200" y="686" text-anchor="middle" fill="#bbf7d0" font-size="13">"3분 후 도착" 등 표시</text>
+
+  <rect x="620" y="630" width="264" height="76" rx="16" fill="#15803d" filter="url(#shadow)"/>
+  <text x="752" y="662" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="700">📍  버스 현재 위치</text>
+  <text x="752" y="686" text-anchor="middle" fill="#bbf7d0" font-size="13">지도에 버스 핀 표시</text>
+
+  <text x="40" y="726" text-anchor="start" fill="#64748b" font-size="13" font-style="italic">④ 두 가지 정보를 동시에 받아옴</text>
+
+  <!-- 합류 -->
+  <line x1="200" y1="708" x2="380" y2="766" stroke="#22c55e" stroke-width="2" marker-end="url(#arr-green)"/>
+  <line x1="752" y1="708" x2="580" y2="766" stroke="#22c55e" stroke-width="2" marker-end="url(#arr-green)"/>
+
+  <rect x="280" y="768" width="400" height="76" rx="16" fill="#166534" filter="url(#shadow)"/>
+  <text x="480" y="800" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="700">📱  앱 화면에 결과 표시</text>
+  <text x="480" y="824" text-anchor="middle" fill="#bbf7d0" font-size="13">버스 도착시간 + 지도 위 버스 위치</text>
+
+  <text x="700" y="860" text-anchor="start" fill="#64748b" font-size="13" font-style="italic">⑤ 사용자 화면에 바로 보여줌</text>
+
+  <!-- 설명 박스 -->
+  <rect x="60" y="876" width="840" height="72" rx="16" fill="#f0fdf4" stroke="#22c55e" stroke-width="2"/>
+  <text x="480" y="906" text-anchor="middle" fill="#166534" font-size="15" font-weight="700">💡 사용자는 버튼 하나로 실시간 버스 정보를 확인합니다</text>
+  <text x="480" y="932" text-anchor="middle" fill="#16a34a" font-size="13">앱이 자동으로 GPS → 정류소 검색 → 도착시간·버스위치 조회까지 처리</text>
+
+  <line x1="20" y1="1062" x2="940" y2="1062" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="480" y="1074" text-anchor="middle" fill="#94a3b8" font-size="11">BusETA — 경기도 버스 도착 정보 앱</text>
+</svg>
+</body></html>

@@ -30,6 +30,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   LocationStatus _locationStatus = LocationStatus.unknown;
+  int _stationLoadRequestId = 0;
 
   List<NearbyStation> _nearbyStations = [];
   bool _stationsLoading = false;
@@ -41,7 +42,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) setState(() => _isLoading = false);
     });
-    _checkLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(const Duration(milliseconds: 250), () {
+        if (!mounted) {
+          return;
+        }
+        _checkLocation();
+      });
+    });
   }
 
   Future<void> _checkLocation() async {
@@ -61,12 +69,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadNearbyStations() async {
-    if (mounted) setState(() { _stationsLoading = true; _stationsError = null; });
+    final requestId = ++_stationLoadRequestId;
+    if (mounted) {
+      setState(() {
+        _stationsLoading = true;
+        _stationsError = null;
+      });
+    }
 
     try {
       final position = await LocationService.instance.getCurrentPosition();
       if (position == null || !mounted) {
-        setState(() { _stationsLoading = false; _stationsError = 'GPS 위치를 가져올 수 없습니다.'; });
+        setState(() {
+          _stationsLoading = false;
+          _stationsError = 'GPS 위치를 가져올 수 없습니다.';
+        });
         return;
       }
 
@@ -75,31 +92,56 @@ class _HomeScreenState extends State<HomeScreen> {
         position.longitude,
       );
 
-      // 최대 5개 정류소에 대해 도착정보 병렬 조회
-      final withArrivals = await Future.wait(
-        stations.take(5).map((s) async {
-          if (s.stationId == null || s.stationId!.isEmpty) return s;
-          try {
-            final arrivals = await BusArrivalService.instance.getArrivalList(s.stationId!);
-            return s.copyWithArrivals(arrivals);
-          } catch (_) {
-            return s;
-          }
-        }),
-      );
+      if (!mounted || requestId != _stationLoadRequestId) {
+        return;
+      }
 
+      final visibleStations = stations.take(5).toList();
       if (mounted) {
         setState(() {
-          _nearbyStations = withArrivals;
+          _nearbyStations = visibleStations;
           _stationsLoading = false;
         });
       }
+
+      _loadArrivalsProgressively(visibleStations, requestId);
     } catch (e) {
       if (mounted) {
         setState(() {
           _stationsLoading = false;
           _stationsError = '정류장 정보를 불러오지 못했습니다.';
         });
+      }
+    }
+  }
+
+  Future<void> _loadArrivalsProgressively(
+    List<NearbyStation> stations,
+    int requestId,
+  ) async {
+    for (final station in stations.take(3)) {
+      final stationId = station.stationId;
+      if (stationId == null || stationId.isEmpty) {
+        continue;
+      }
+
+      try {
+        final arrivals = await BusArrivalService.instance.getArrivalList(stationId);
+        if (!mounted || requestId != _stationLoadRequestId) {
+          return;
+        }
+
+        setState(() {
+          _nearbyStations = _nearbyStations
+              .map(
+                (item) => item.stationId == stationId
+                    ? item.copyWithArrivals(arrivals)
+                    : item,
+              )
+              .toList();
+        });
+      } catch (_) {
+        // 일부 정류장 도착정보 실패는 화면 전체 실패로 보지 않는다.
       }
     }
   }

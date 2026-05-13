@@ -3,22 +3,23 @@ import 'package:flutter/material.dart';
 import '../../../app/theme/app_theme.dart';
 import '../data/local_auth_repository.dart';
 
-class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+class FindAccountScreen extends StatefulWidget {
+  const FindAccountScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  State<FindAccountScreen> createState() => _FindAccountScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _FindAccountScreenState extends State<FindAccountScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _nameController = TextEditingController();
   bool _isLoading = false;
-  AuthUser? _matchedUser;
+  bool _searched = false;
+  List<AuthUser> _results = const [];
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -26,23 +27,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    final user = await LocalAuthRepository.instance.findUserByEmail(
-      _emailController.text,
-    );
+    final results =
+        await LocalAuthRepository.instance.findAccountsByName(_nameController.text);
 
     if (!mounted) return;
-
-    if (user == null) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('가입된 이메일을 찾을 수 없습니다.')),
-      );
-      return;
-    }
-
     setState(() {
       _isLoading = false;
-      _matchedUser = user;
+      _searched = true;
+      _results = results;
     });
   }
 
@@ -62,7 +54,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          '비밀번호 찾기',
+          '계정 찾기',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -71,32 +63,37 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-          child: _matchedUser == null
-              ? _FormView(
-                  formKey: _formKey,
-                  emailController: _emailController,
-                  isLoading: _isLoading,
-                  onSubmit: _submit,
-                )
-              : _SuccessView(user: _matchedUser!),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _FindAccountForm(
+                formKey: _formKey,
+                nameController: _nameController,
+                isLoading: _isLoading,
+                onSubmit: _submit,
+              ),
+              const SizedBox(height: 24),
+              if (_searched) _SearchResultSection(results: _results),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _FormView extends StatelessWidget {
-  const _FormView({
+class _FindAccountForm extends StatelessWidget {
+  const _FindAccountForm({
     required this.formKey,
-    required this.emailController,
+    required this.nameController,
     required this.isLoading,
     required this.onSubmit,
   });
 
   final GlobalKey<FormState> formKey;
-  final TextEditingController emailController;
+  final TextEditingController nameController;
   final bool isLoading;
   final VoidCallback onSubmit;
 
@@ -115,14 +112,14 @@ class _FormView extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.lock_reset_rounded,
+              Icons.person_search_rounded,
               color: AppTheme.secondary,
               size: 32,
             ),
           ),
           const SizedBox(height: 24),
           const Text(
-            '가입하신 이메일을 입력해 주세요',
+            '가입한 계정을 찾아드릴게요',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
@@ -131,16 +128,12 @@ class _FormView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            '현재는 가입된 이메일 확인과 로그인 방식 안내까지만 제공합니다.',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTheme.muted,
-              height: 1.5,
-            ),
+            '회원가입 시 입력한 이름으로 등록된 계정을 조회합니다.',
+            style: TextStyle(fontSize: 14, color: AppTheme.muted, height: 1.5),
           ),
           const SizedBox(height: 32),
           const Text(
-            '이메일',
+            '이름',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -149,13 +142,12 @@ class _FormView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           TextFormField(
-            controller: emailController,
-            keyboardType: TextInputType.emailAddress,
+            controller: nameController,
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => onSubmit(),
             style: const TextStyle(fontSize: 15, color: AppTheme.text),
             decoration: InputDecoration(
-              hintText: 'example@email.com',
+              hintText: '홍길동',
               hintStyle: const TextStyle(color: AppTheme.muted, fontSize: 15),
               filled: true,
               fillColor: Colors.white,
@@ -187,10 +179,7 @@ class _FormView extends StatelessWidget {
             ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return '이메일을 입력해 주세요.';
-              }
-              if (!value.contains('@')) {
-                return '올바른 이메일 형식이 아닙니다.';
+                return '이름을 입력해 주세요.';
               }
               return null;
             },
@@ -215,7 +204,7 @@ class _FormView extends StatelessWidget {
                     ),
                   )
                 : const Text(
-                    '가입 이메일 확인',
+                    '계정 조회',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -229,102 +218,100 @@ class _FormView extends StatelessWidget {
   }
 }
 
-class _SuccessView extends StatelessWidget {
-  const _SuccessView({required this.user});
+class _SearchResultSection extends StatelessWidget {
+  const _SearchResultSection({required this.results});
+
+  final List<AuthUser> results;
+
+  @override
+  Widget build(BuildContext context) {
+    if (results.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE4EAF1)),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '일치하는 계정을 찾지 못했습니다.',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.text,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '회원가입 시 입력한 이름을 다시 확인해 주세요.',
+              style: TextStyle(fontSize: 14, color: AppTheme.muted, height: 1.5),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '조회된 계정 ${results.length}개',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: AppTheme.text,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...results.map(
+          (user) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _AccountCard(user: user),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AccountCard extends StatelessWidget {
+  const _AccountCard({required this.user});
 
   final AuthUser user;
 
   @override
   Widget build(BuildContext context) {
-    final isLocal = user.provider == 'local';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: const BoxDecoration(
-            color: Color(0xFFE8F7F0),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.mark_email_read_rounded,
-            color: Color(0xFF1F8F63),
-            size: 32,
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          '가입된 계정을 확인했습니다',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: AppTheme.text,
-          ),
-        ),
-        const SizedBox(height: 10),
-        RichText(
-          text: TextSpan(
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE4EAF1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _maskEmail(user.email),
             style: const TextStyle(
-              fontSize: 14,
-              color: AppTheme.muted,
-              height: 1.6,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppTheme.text,
             ),
-            children: [
-              TextSpan(
-                text: user.email,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.text,
-                ),
-              ),
-              TextSpan(
-                text: isLocal
-                    ? ' 으로 가입된 로컬 계정입니다.\n현재는 이메일 확인까지만 지원하며,\n재설정 메일 발송은 추후 백엔드 연동 후 제공됩니다.'
-                    : ' 은(는) ${_providerLabel(user.provider)} 계정입니다.\n비밀번호 재설정은 해당 소셜 서비스에서 진행해 주세요.',
-              ),
-            ],
           ),
-        ),
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF4F7FB),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Text(
-            isLocal
-                ? '현재 앱은 로컬 저장 구조를 사용 중이라 실제 인증 메일을 보내지 않습니다.'
-                : '${_providerLabel(user.provider)} 로그인 사용자는 해당 서비스의 계정 복구 메뉴를 이용해야 합니다.',
+          const SizedBox(height: 6),
+          Text(
+            '가입 방식: ${_providerLabel(user.provider)}',
             style: const TextStyle(
               fontSize: 13,
-              height: 1.5,
               color: AppTheme.muted,
             ),
           ),
-        ),
-        const SizedBox(height: 20),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(),
-          style: FilledButton.styleFrom(
-            backgroundColor: AppTheme.primary,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-          child: const Text(
-            '로그인으로 돌아가기',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -339,5 +326,19 @@ class _SuccessView extends StatelessWidget {
       default:
         return '로컬';
     }
+  }
+
+  String _maskEmail(String email) {
+    final parts = email.split('@');
+    if (parts.length != 2) return email;
+
+    final local = parts.first;
+    final domain = parts.last;
+    if (local.length <= 2) {
+      return '${local[0]}*@$domain';
+    }
+    final visible = local.substring(0, 2);
+    final masked = '*' * (local.length - 2);
+    return '$visible$masked@$domain';
   }
 }

@@ -43,6 +43,20 @@ class LocationService {
     }
   }
 
+  Stream<Position> getPositionStream() async* {
+    final status = await checkStatus();
+    if (status != LocationStatus.granted) {
+      return;
+    }
+
+    yield* Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      ),
+    );
+  }
+
   LocationStatus _map(LocationPermission p) {
     switch (p) {
       case LocationPermission.always:

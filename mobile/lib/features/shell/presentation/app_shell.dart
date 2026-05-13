@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_theme.dart';
 import '../../../core/data/demo_data.dart';
 import '../../../core/models/bus_eta_models.dart';
 import '../../../core/storage/saved_route_storage.dart';
 import '../../auth/presentation/login_screen.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../home/presentation/home_screen.dart';
 import '../../map/presentation/map_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
@@ -14,15 +15,16 @@ import '../../saved_routes/presentation/saved_routes_screen.dart';
 import '../../search/presentation/search_screen.dart';
 import '../../settings/presentation/settings_screen.dart';
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> {
   int _currentIndex = 0;
+  final Set<int> _initializedTabs = {0};
   SearchPair? _pendingSearchPair;
   int _searchRequestId = 0;
   List<SavedRoute> _savedRoutes = [...DemoData.savedRoutes];
@@ -65,10 +67,51 @@ class _AppShellState extends State<AppShell> {
 
   void _openSearchWithPair(SearchPair pair) {
     setState(() {
+      _initializedTabs.add(1);
       _pendingSearchPair = pair;
       _searchRequestId += 1;
       _currentIndex = 1;
     });
+  }
+
+  Widget _buildScreen(int index) {
+    if (!_initializedTabs.contains(index)) {
+      return const SizedBox.shrink();
+    }
+
+    switch (index) {
+      case 0:
+        return HomeScreen(
+          onOpenRoute: _openRoute,
+          onLoadSearch: _openSearchWithPair,
+          savedRoutes: _savedRoutes,
+          onRefresh: _loadSavedRoutes,
+        );
+      case 1:
+        return SearchScreen(
+          onOpenRoute: _openRoute,
+          onSaveRoute: _createSavedRoute,
+          savedRoutes: _savedRoutes,
+          prefillPair: _pendingSearchPair,
+          prefillRequestId: _searchRequestId,
+        );
+      case 2:
+        return MapScreen(isActive: _currentIndex == 2);
+      case 3:
+        return SavedRoutesScreen(
+          onOpenRoute: _openRoute,
+          onLoadSearch: _openSearchWithPair,
+          savedRoutes: _savedRoutes,
+          onCreateRoute: _createSavedRoute,
+          onUpdateRoute: _updateSavedRoute,
+          onTogglePin: _toggleSavedRoutePin,
+          onMoveRoute: _moveSavedRoute,
+          onDeleteRoute: _deleteSavedRoute,
+          onRefresh: _loadSavedRoutes,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   void _updateSavedRoute(SavedRoute route) {
@@ -156,33 +199,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final screens = [
-      HomeScreen(
-        onOpenRoute: _openRoute,
-        onLoadSearch: _openSearchWithPair,
-        savedRoutes: _savedRoutes,
-        onRefresh: _loadSavedRoutes,
-      ),
-      SearchScreen(
-        onOpenRoute: _openRoute,
-        onSaveRoute: _createSavedRoute,
-        savedRoutes: _savedRoutes,
-        prefillPair: _pendingSearchPair,
-        prefillRequestId: _searchRequestId,
-      ),
-      const MapScreen(),
-      SavedRoutesScreen(
-        onOpenRoute: _openRoute,
-        onLoadSearch: _openSearchWithPair,
-        savedRoutes: _savedRoutes,
-        onCreateRoute: _createSavedRoute,
-        onUpdateRoute: _updateSavedRoute,
-        onTogglePin: _toggleSavedRoutePin,
-        onMoveRoute: _moveSavedRoute,
-        onDeleteRoute: _deleteSavedRoute,
-        onRefresh: _loadSavedRoutes,
-      ),
-    ];
+    final screens = List<Widget>.generate(4, _buildScreen);
 
     return Scaffold(
       body: Stack(
@@ -214,9 +231,8 @@ class _AppShellState extends State<AppShell> {
                       MaterialPageRoute(builder: (_) => const SettingsScreen()),
                     );
                   } else if (value == 'logout') {
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.remove('auto_login');
-                    if (!mounted) return;
+                    await ref.read(authProvider.notifier).logout();
+                    if (!context.mounted) return;
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
                           builder: (_) => const LoginScreen()),
@@ -290,6 +306,7 @@ class _AppShellState extends State<AppShell> {
                 ],
                 onDestinationSelected: (index) {
                   setState(() {
+                    _initializedTabs.add(index);
                     _currentIndex = index;
                   });
                 },

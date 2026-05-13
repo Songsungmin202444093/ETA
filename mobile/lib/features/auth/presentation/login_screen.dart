@@ -1,25 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/theme/app_theme.dart';
+import '../data/google_auth_service.dart';
+import '../data/kakao_auth_service.dart';
+import '../data/local_auth_repository.dart';
+import '../data/naver_auth_service.dart';
+import '../data/social_auth_setup.dart';
+import '../providers/auth_provider.dart';
 import '../../shell/presentation/app_shell.dart';
+import 'find_account_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _isLoading = false;
+  bool _isLocalLoading = false;
+  String? _activeSocialProvider;
   bool _rememberMe = false;
+
+  bool get _isBusy => _isLocalLoading || _activeSocialProvider != null;
 
   @override
   void initState() {
@@ -41,40 +52,77 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() {
+  Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_isBusy) return;
 
-    setState(() => _isLoading = true);
+    setState(() => _isLocalLoading = true);
 
-    // TODO: DB 연동 시 실제 인증으로 교체
-    Future.delayed(const Duration(milliseconds: 600), () async {
-      if (!mounted) return;
-      final prefs = await SharedPreferences.getInstance();
-      if (_rememberMe) {
-        await prefs.setBool('auto_login', true);
-      } else {
-        await prefs.remove('auto_login');
-      }
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const AppShell()),
+    final error = await ref.read(authProvider.notifier).login(
+          _emailController.text,
+          _passwordController.text,
+          rememberMe: _rememberMe,
+        );
+
+    if (!mounted) return;
+    setState(() => _isLocalLoading = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: const Color(0xFFD64545),
+        ),
       );
-    });
+      return;
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const AppShell()),
+    );
   }
 
-  void _socialLogin(String provider) {
-    // TODO: 각 소셜 OAuth SDK 연동 시 교체
-    // - 카카오: kakao_flutter_sdk_user
-    // - 구글: google_sign_in
-    // - 네이버: flutter_naver_login
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$provider 로그인은 준비 중입니다.'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: AppTheme.primary,
-      ),
+  Future<void> _socialLogin(String provider) async {
+    if (_isBusy) return;
+
+    setState(() => _activeSocialProvider = provider);
+
+    AuthResult result;
+    switch (provider) {
+      case '카카오':
+        result = await KakaoAuthService.login();
+      case '구글':
+        result = await GoogleAuthService.login();
+      case '네이버':
+        result = await NaverAuthService.login();
+      default:
+        setState(() => _activeSocialProvider = null);
+        return;
+    }
+
+    if (!mounted) return;
+    setState(() => _activeSocialProvider = null);
+
+    if (!result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.errorMessage!),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: const Color(0xFFD64545),
+        ),
+      );
+      return;
+    }
+
+    // 소셜 로그인 성공 시 authProvider 상태만 갱신 (레포지토리는 서비스에서 이미 저장)
+    ref.read(authProvider.notifier).setCurrentUser(result.user!);
+
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const AppShell()),
     );
   }
 
@@ -137,7 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 로그인 상태 유지 + 비밀번호 찾기
+                  // 로그인 상태 유지 + 계정/비밀번호 찾기
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -165,21 +213,50 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ],
                       ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => const ForgotPasswordScreen(),
-                          ));
-                        },
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text(
-                          '비밀번호를 잊으셨나요?',
-                          style: TextStyle(
-                              fontSize: 13, color: AppTheme.secondary),
-                        ),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const FindAccountScreen(),
+                                ),
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              '계정 찾기',
+                              style: TextStyle(
+                                  fontSize: 13, color: AppTheme.secondary),
+                            ),
+                          ),
+                          const Text(
+                            '  |  ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => const ForgotPasswordScreen(),
+                              ));
+                            },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              '비밀번호 찾기',
+                              style: TextStyle(
+                                  fontSize: 13, color: AppTheme.secondary),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -187,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // 로그인 버튼
                   FilledButton(
-                    onPressed: _isLoading ? null : _login,
+                    onPressed: _isBusy ? null : _login,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -195,7 +272,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    child: _isLoading
+                    child: _isLocalLoading
                         ? const SizedBox(
                             height: 20,
                             width: 20,
@@ -227,12 +304,24 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       TextButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
+                        onPressed: () async {
+                          final result = await Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) => const SignupScreen(),
                             ),
                           );
+                          if (!context.mounted) return;
+                          if (result is String && result.isNotEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(result),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                backgroundColor: AppTheme.primary,
+                              ),
+                            );
+                          }
                         },
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -253,35 +342,52 @@ class _LoginScreenState extends State<LoginScreen> {
                   // 소셜 로그인 구분선
                   const _OrDivider(),
                   const SizedBox(height: 20),
+                  FutureBuilder<SocialAuthConfig>(
+                    future: SocialAuthSetup.load(),
+                    builder: (context, snapshot) {
+                      final config = snapshot.data ??
+                          const SocialAuthConfig(
+                            kakaoConfigured: true,
+                            googleConfigured: false,
+                            naverConfigured: false,
+                            googleServerClientId: null,
+                          );
 
-                  // 카카오 로그인
-                  _SocialButton(
-                    label: '카카오로 시작하기',
-                    backgroundColor: const Color(0xFFFEE500),
-                    textColor: const Color(0xFF191919),
-                    icon: _KakaoIcon(),
-                    onTap: () => _socialLogin('카카오'),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 구글 로그인
-                  _SocialButton(
-                    label: 'Google로 시작하기',
-                    backgroundColor: Colors.white,
-                    textColor: const Color(0xFF191919),
-                    borderColor: const Color(0xFFDDE3EA),
-                    icon: _GoogleIcon(),
-                    onTap: () => _socialLogin('구글'),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 네이버 로그인
-                  _SocialButton(
-                    label: '네이버로 시작하기',
-                    backgroundColor: const Color(0xFF03C75A),
-                    textColor: Colors.white,
-                    icon: _NaverIcon(),
-                    onTap: () => _socialLogin('네이버'),
+                      return Column(
+                        children: [
+                          _SocialButton(
+                            label: '카카오로 시작하기',
+                            backgroundColor: const Color(0xFFFEE500),
+                            textColor: const Color(0xFF191919),
+                            icon: _KakaoIcon(),
+                            enabled: !_isBusy && config.kakaoConfigured,
+                            isLoading: _activeSocialProvider == '카카오',
+                            onTap: () => _socialLogin('카카오'),
+                          ),
+                          const SizedBox(height: 12),
+                          _SocialButton(
+                            label: 'Google로 시작하기',
+                            backgroundColor: Colors.white,
+                            textColor: const Color(0xFF191919),
+                            borderColor: const Color(0xFFDDE3EA),
+                            icon: _GoogleIcon(),
+                            enabled: !_isBusy && config.googleConfigured,
+                            isLoading: _activeSocialProvider == '구글',
+                            onTap: () => _socialLogin('구글'),
+                          ),
+                          const SizedBox(height: 12),
+                          _SocialButton(
+                            label: '네이버로 시작하기',
+                            backgroundColor: const Color(0xFF03C75A),
+                            textColor: Colors.white,
+                            icon: _NaverIcon(),
+                            enabled: !_isBusy && config.naverConfigured,
+                            isLoading: _activeSocialProvider == '네이버',
+                            onTap: () => _socialLogin('네이버'),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 8),
                 ],
@@ -324,6 +430,8 @@ class _SocialButton extends StatelessWidget {
     required this.textColor,
     required this.icon,
     required this.onTap,
+    required this.enabled,
+    this.isLoading = false,
     this.borderColor,
   });
 
@@ -332,38 +440,53 @@ class _SocialButton extends StatelessWidget {
   final Color textColor;
   final Widget icon;
   final VoidCallback onTap;
+  final bool enabled;
+  final bool isLoading;
   final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: backgroundColor,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
+    return Opacity(
+      opacity: enabled || isLoading ? 1 : 0.55,
+      child: Material(
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          decoration: borderColor != null
-              ? BoxDecoration(
-                  border: Border.all(color: borderColor!),
-                  borderRadius: BorderRadius.circular(14),
-                )
-              : null,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              icon,
-              const SizedBox(width: 10),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: textColor,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: enabled && !isLoading ? onTap : null,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+            decoration: borderColor != null
+                ? BoxDecoration(
+                    border: Border.all(color: borderColor!),
+                    borderRadius: BorderRadius.circular(14),
+                  )
+                : null,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isLoading)
+                  SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      valueColor: AlwaysStoppedAnimation<Color>(textColor),
+                    ),
+                  )
+                else
+                  icon,
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -1,0 +1,109 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"/><title>BusETA 로그인 플로우</title>
+<style>* { margin:0; padding:0; box-sizing:border-box; } html,body { width:960px; height:1080px; background:#f0f4f8; overflow:hidden; font-family:"Malgun Gothic","Segoe UI",sans-serif; }</style>
+</head>
+<body>
+<svg width="960" height="1080" viewBox="0 0 960 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3.5" orient="auto"><path d="M0,0 L0,7 L10,3.5 z" fill="#94a3b8"/></marker>
+    <marker id="arr-purple" markerWidth="10" markerHeight="10" refX="8" refY="3.5" orient="auto"><path d="M0,0 L0,7 L10,3.5 z" fill="#a855f7"/></marker>
+    <filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#00000015"/></filter>
+  </defs>
+
+  <rect width="960" height="1080" fill="#f0f4f8"/>
+
+  <!-- 헤더 -->
+  <rect x="0" y="0" width="960" height="80" fill="#ffffff" filter="url(#shadow)"/>
+  <text x="480" y="32" text-anchor="middle" fill="#1e293b" font-size="24" font-weight="700">🔐 소셜 로그인 흐름</text>
+  <text x="480" y="62" text-anchor="middle" fill="#64748b" font-size="15">카카오·구글·네이버 계정으로 로그인하는 과정</text>
+
+  <!-- 패널 배경 -->
+  <rect x="20" y="92" width="920" height="972" rx="24" fill="#ffffff" filter="url(#shadow)"/>
+  <rect x="20" y="92" width="920" height="56" rx="24" fill="#ede9fe"/>
+  <rect x="20" y="128" width="920" height="20" fill="#ede9fe"/>
+  <text x="480" y="126" text-anchor="middle" fill="#6d28d9" font-size="16" font-weight="700">내가 로그인 버튼을 누를 때 일어나는 일</text>
+
+  <!-- STEP 1: 사용자 -->
+  <rect x="330" y="162" width="300" height="76" rx="16" fill="#6d28d9" filter="url(#shadow)"/>
+  <text x="480" y="193" text-anchor="middle" fill="#ffffff" font-size="17" font-weight="700">👤  나 (사용자)</text>
+  <text x="480" y="219" text-anchor="middle" fill="#ddd6fe" font-size="14">로그인 화면에서 버튼 선택</text>
+  <line x1="480" y1="240" x2="480" y2="278" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="642" y="263" text-anchor="start" fill="#64748b" font-size="13" font-style="italic">① 카카오/구글/네이버 선택</text>
+
+  <!-- STEP 2: 로그인 화면 -->
+  <rect x="330" y="280" width="300" height="76" rx="16" fill="#7c3aed" filter="url(#shadow)"/>
+  <text x="480" y="312" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="700">📲  앱 로그인 화면</text>
+  <text x="480" y="338" text-anchor="middle" fill="#ede9fe" font-size="13">선택한 소셜 서비스로 연결</text>
+  <!-- 세 갈래 -->
+  <line x1="370" y1="358" x2="130" y2="416" stroke="#a855f7" stroke-width="2" marker-end="url(#arr-purple)"/>
+  <line x1="480" y1="358" x2="480" y2="416" stroke="#a855f7" stroke-width="2" marker-end="url(#arr-purple)"/>
+  <line x1="590" y1="358" x2="820" y2="416" stroke="#a855f7" stroke-width="2" marker-end="url(#arr-purple)"/>
+  <text x="730" y="373" text-anchor="start" fill="#64748b" font-size="13" font-style="italic">② 소셜 앱/페이지 실행</text>
+
+  <!-- 카카오 -->
+  <rect x="30" y="418" width="200" height="84" rx="14" fill="#FEE500" filter="url(#shadow)"/>
+  <text x="130" y="452" text-anchor="middle" fill="#3C1E1E" font-size="16" font-weight="700">🟡 카카오</text>
+  <text x="130" y="476" text-anchor="middle" fill="#3C1E1E" font-size="12">카카오 계정으로</text>
+  <text x="130" y="494" text-anchor="middle" fill="#3C1E1E" font-size="12">본인 인증</text>
+
+  <!-- 구글 -->
+  <rect x="380" y="418" width="200" height="84" rx="14" fill="#ffffff" stroke="#dadce0" stroke-width="2" filter="url(#shadow)"/>
+  <text x="480" y="452" text-anchor="middle" fill="#3c4043" font-size="16" font-weight="700">🔵 구글</text>
+  <text x="480" y="476" text-anchor="middle" fill="#5f6368" font-size="12">구글 계정으로</text>
+  <text x="480" y="494" text-anchor="middle" fill="#5f6368" font-size="12">본인 인증</text>
+
+  <!-- 네이버 -->
+  <rect x="730" y="418" width="200" height="84" rx="14" fill="#03C75A" filter="url(#shadow)"/>
+  <text x="830" y="452" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="700">🟢 네이버</text>
+  <text x="830" y="476" text-anchor="middle" fill="#ffffff" font-size="12">네이버 계정으로</text>
+  <text x="830" y="494" text-anchor="middle" fill="#ffffff" font-size="12">본인 인증</text>
+
+  <text x="642" y="534" text-anchor="start" fill="#64748b" font-size="13" font-style="italic">③ 서버 본인 확인 후 OK 전송</text>
+
+  <!-- 인증 완료 -->
+  <line x1="130" y1="504" x2="130" y2="558" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="480" y1="504" x2="480" y2="558" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="830" y1="504" x2="830" y2="558" stroke="#94a3b8" stroke-width="2" marker-end="url(#arr)"/>
+
+  <rect x="30" y="560" width="200" height="64" rx="14" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="130" y="587" text-anchor="middle" fill="#475569" font-size="14" font-weight="700">✅ 인증 완료</text>
+  <text x="130" y="609" text-anchor="middle" fill="#64748b" font-size="12">토큰 발급</text>
+
+  <rect x="380" y="560" width="200" height="64" rx="14" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="480" y="587" text-anchor="middle" fill="#475569" font-size="14" font-weight="700">✅ 인증 완료</text>
+  <text x="480" y="609" text-anchor="middle" fill="#64748b" font-size="12">토큰 발급</text>
+
+  <rect x="730" y="560" width="200" height="64" rx="14" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="830" y="587" text-anchor="middle" fill="#475569" font-size="14" font-weight="700">✅ 인증 완료</text>
+  <text x="830" y="609" text-anchor="middle" fill="#64748b" font-size="12">토큰 발급</text>
+
+  <!-- 합류 -->
+  <line x1="130" y1="626" x2="360" y2="698" stroke="#a855f7" stroke-width="2" marker-end="url(#arr-purple)"/>
+  <line x1="480" y1="626" x2="480" y2="698" stroke="#a855f7" stroke-width="2" marker-end="url(#arr-purple)"/>
+  <line x1="830" y1="626" x2="600" y2="698" stroke="#a855f7" stroke-width="2" marker-end="url(#arr-purple)"/>
+
+  <text x="730" y="665" text-anchor="start" fill="#64748b" font-size="13" font-style="italic">④ 로그인 정보 폰에 저장</text>
+
+  <!-- 저장 -->
+  <rect x="230" y="700" width="500" height="76" rx="16" fill="#7c3aed" filter="url(#shadow)"/>
+  <text x="480" y="732" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="700">💾  로그인 정보 폰에 저장</text>
+  <text x="480" y="758" text-anchor="middle" fill="#ddd6fe" font-size="13">앱을 껐다 켜도 로그인 유지</text>
+
+  <line x1="480" y1="778" x2="480" y2="816" stroke="#a855f7" stroke-width="2" marker-end="url(#arr-purple)"/>
+  <text x="746" y="800" text-anchor="start" fill="#64748b" font-size="13" font-style="italic">⑤ 완료!</text>
+
+  <!-- 완료 -->
+  <rect x="230" y="818" width="500" height="76" rx="16" fill="#6d28d9" filter="url(#shadow)"/>
+  <text x="480" y="850" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="700">🎉  로그인 완료!</text>
+  <text x="480" y="876" text-anchor="middle" fill="#ddd6fe" font-size="13">메인 화면으로 이동</text>
+
+  <!-- 설명 박스 -->
+  <rect x="60" y="916" width="840" height="72" rx="16" fill="#faf5ff" stroke="#a855f7" stroke-width="2"/>
+  <text x="480" y="946" text-anchor="middle" fill="#6d28d9" font-size="15" font-weight="700">💡 한 번 로그인하면 다음 실행부터 자동으로 로그인됩니다</text>
+  <text x="480" y="972" text-anchor="middle" fill="#7c3aed" font-size="13">카카오·구글·네이버 서버가 본인을 확인해주면 앱이 그 정보를 기억</text>
+
+  <line x1="20" y1="1062" x2="940" y2="1062" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="480" y="1074" text-anchor="middle" fill="#94a3b8" font-size="11">BusETA — 경기도 버스 도착 정보 앱</text>
+</svg>
+</body></html>

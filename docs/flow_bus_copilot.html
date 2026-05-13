@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<title>BusETA Bus Flow Presentation</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:960px;
+  height:1080px;
+  overflow:hidden;
+  background:#eef5f9;
+  font-family:"Malgun Gothic","Segoe UI",sans-serif;
+}
+</style>
+</head>
+<body>
+<svg width="960" height="1080" viewBox="0 0 960 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f7fbff"/>
+      <stop offset="100%" stop-color="#edf7fb"/>
+    </linearGradient>
+    <linearGradient id="head" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0f172a18"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L11,4 z" fill="#0284c7"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="1080" fill="url(#bg)"/>
+  <circle cx="110" cy="126" r="96" fill="#dbeafe" opacity="0.75"/>
+  <circle cx="860" cy="950" r="120" fill="#bae6fd" opacity="0.45"/>
+
+  <rect x="48" y="42" width="864" height="108" rx="32" fill="#ffffff" filter="url(#shadow)"/>
+  <text x="480" y="88" text-anchor="middle" fill="#0f172a" font-size="30" font-weight="700">버스 정보 조회 흐름</text>
+  <text x="480" y="122" text-anchor="middle" fill="#475569" font-size="16">발표용 세로 구성 | 실시간 조회 과정만 분리</text>
+
+  <rect x="72" y="182" width="816" height="820" rx="34" fill="#ffffff" filter="url(#shadow)"/>
+  <rect x="72" y="182" width="816" height="88" rx="34" fill="url(#head)"/>
+  <text x="480" y="234" text-anchor="middle" fill="#ffffff" font-size="27" font-weight="700">사용자 행동부터 결과 표시까지</text>
+
+  <rect x="282" y="312" width="396" height="88" rx="28" fill="#eff6ff" stroke="#93c5fd" stroke-width="2"/>
+  <text x="480" y="350" text-anchor="middle" fill="#0f172a" font-size="24" font-weight="700">1. 앱 화면 열기</text>
+  <text x="480" y="378" text-anchor="middle" fill="#334155" font-size="15">지도 또는 홈에서 조회 시작</text>
+  <line x1="480" y1="400" x2="480" y2="460" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="666" y="434" text-anchor="start" fill="#0369a1" font-size="15" font-weight="700">GPS 활성화</text>
+
+  <rect x="282" y="476" width="396" height="88" rx="28" fill="#ecfeff" stroke="#67e8f9" stroke-width="2"/>
+  <text x="480" y="514" text-anchor="middle" fill="#0f172a" font-size="24" font-weight="700">2. 위치와 정류소 탐색</text>
+  <text x="480" y="542" text-anchor="middle" fill="#334155" font-size="15">현재 좌표를 얻고 주변 정류소를 요청</text>
+  <line x1="480" y1="564" x2="480" y2="620" stroke="#0284c7" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="92" y="646" width="302" height="116" rx="30" fill="#ffffff" stroke="#bae6fd" stroke-width="2"/>
+  <text x="243" y="691" text-anchor="middle" fill="#0f172a" font-size="22" font-weight="700">도착 예정 시간</text>
+  <text x="243" y="721" text-anchor="middle" fill="#0f766e" font-size="15">예: 3분 후 도착</text>
+  <rect x="566" y="646" width="302" height="116" rx="30" fill="#ffffff" stroke="#86efac" stroke-width="2"/>
+  <text x="717" y="691" text-anchor="middle" fill="#0f172a" font-size="22" font-weight="700">버스 현재 위치</text>
+  <text x="717" y="721" text-anchor="middle" fill="#166534" font-size="15">지도에 버스 핀 표시</text>
+
+  <line x1="243" y1="762" x2="404" y2="836" stroke="#0891b2" stroke-width="4" marker-end="url(#arrow)"/>
+  <line x1="717" y1="762" x2="556" y2="836" stroke="#16a34a" stroke-width="4" marker-end="url(#arrow)"/>
+  <text x="104" y="804" fill="#0369a1" font-size="14" font-weight="700">두 데이터를 합쳐 결과 화면 구성</text>
+
+  <rect x="242" y="852" width="476" height="110" rx="32" fill="#0f766e"/>
+  <text x="480" y="898" text-anchor="middle" fill="#ffffff" font-size="25" font-weight="700">3. 앱 화면에 결과 표시</text>
+  <text x="480" y="929" text-anchor="middle" fill="#ccfbf1" font-size="16">사용자는 한 번의 동작으로 실시간 버스 정보를 확인</text>
+
+  <rect x="110" y="972" width="740" height="40" rx="20" fill="#dff6ff"/>
+  <text x="480" y="998" text-anchor="middle" fill="#075985" font-size="15" font-weight="700">BusETA 발표용 디자인 | 발표 슬라이드 세로 배치 최적화</text>
+</svg>
+</body>
+</html>

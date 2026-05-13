@@ -48,7 +48,7 @@ class _SkeletonBoxState extends State<SkeletonBox>
 
     return AnimatedBuilder(
       animation: _animation,
-      builder: (_, __) => Container(
+      builder: (context, child) => Container(
         width: widget.width,
         height: widget.height,
         decoration: BoxDecoration(

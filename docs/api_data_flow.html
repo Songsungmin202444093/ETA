@@ -1,0 +1,188 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <title>BusETA API 데이터 플로우</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { width:1920px; height:1080px; background:#0f172a; overflow:hidden; }
+  </style>
+</head>
+<body>
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#475569"/></marker>
+    <marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#16a34a"/></marker>
+    <marker id="ai" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#6366f1"/></marker>
+    <marker id="ap" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#7c3aed"/></marker>
+    <marker id="ac" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#0891b2"/></marker>
+  </defs>
+
+  <!-- title -->
+  <text x="960" y="42" text-anchor="middle" fill="#f1f5f9" font-size="26" font-weight="700" font-family="Segoe UI,sans-serif">BusETA 외부 API 데이터 플로우</text>
+  <text x="960" y="68" text-anchor="middle" fill="#64748b" font-size="14" font-family="Segoe UI,sans-serif">버스 공공데이터 API · 소셜 로그인 SDK 연동 흐름</text>
+
+  <!-- ───── 좌측 배경 (버스) ───── -->
+  <rect x="15" y="82" width="920" height="970" rx="20" fill="#0d1f0d" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.65"/>
+  <text x="36" y="108" fill="#16a34a" font-size="12" font-weight="600" font-family="Segoe UI,sans-serif" letter-spacing="1">🚌  버스 실시간 데이터 흐름</text>
+
+  <!-- ───── 우측 배경 (소셜) ───── -->
+  <rect x="950" y="82" width="955" height="970" rx="20" fill="#1a0d2e" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.65"/>
+  <text x="972" y="108" fill="#c4b5fd" font-size="12" font-weight="600" font-family="Segoe UI,sans-serif" letter-spacing="1">🔐  소셜 로그인 흐름</text>
+
+  <!-- ===== 버스 흐름 ===== -->
+  <!-- 사용자 -->
+  <rect x="358" y="128" width="230" height="68" rx="12" fill="#1e3a5f" stroke="#2563eb" stroke-width="2"/>
+  <text x="473" y="157" text-anchor="middle" fill="#93c5fd" font-size="14" font-weight="700" font-family="Segoe UI,sans-serif">사용자</text>
+  <text x="473" y="178" text-anchor="middle" fill="#93c5fd" font-size="11" opacity="0.75" font-family="Segoe UI,sans-serif">앱 실행 / 화면 조작</text>
+
+  <!-- 홈/지도 화면 -->
+  <rect x="347" y="272" width="252" height="68" rx="12" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text x="473" y="301" text-anchor="middle" fill="#cbd5e1" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">홈 / 지도 화면</text>
+  <text x="473" y="322" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Segoe UI,sans-serif">HomeScreen · MapScreen</text>
+
+  <line x1="473" y1="198" x2="473" y2="270" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="480" y="239" fill="#475569" font-size="11" font-family="Segoe UI,sans-serif">탭 이동</text>
+
+  <!-- LocationService -->
+  <rect x="80" y="418" width="220" height="68" rx="12" fill="#1a2e1a" stroke="#16a34a" stroke-width="2"/>
+  <text x="190" y="448" text-anchor="middle" fill="#86efac" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">LocationService</text>
+  <text x="190" y="469" text-anchor="middle" fill="#86efac" font-size="11" opacity="0.75" font-family="Segoe UI,sans-serif">Geolocator</text>
+
+  <!-- BusStopService -->
+  <rect x="640" y="418" width="220" height="68" rx="12" fill="#1a2e1a" stroke="#16a34a" stroke-width="2"/>
+  <text x="750" y="448" text-anchor="middle" fill="#86efac" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">BusStopService</text>
+  <text x="750" y="469" text-anchor="middle" fill="#86efac" font-size="11" opacity="0.75" font-family="Segoe UI,sans-serif">정류소 조회</text>
+
+  <!-- HomeScreen → LocationService -->
+  <line x1="420" y1="342" x2="230" y2="416" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ag)"/>
+  <text x="288" y="382" fill="#16a34a" font-size="10" font-family="Segoe UI,sans-serif">위치 권한 요청</text>
+
+  <!-- HomeScreen → BusStopService -->
+  <line x1="527" y1="342" x2="710" y2="416" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ag)"/>
+  <text x="588" y="382" fill="#16a34a" font-size="10" font-family="Segoe UI,sans-serif">좌표 전달</text>
+
+  <!-- BusLocationService -->
+  <rect x="80" y="568" width="220" height="68" rx="12" fill="#1a2e1a" stroke="#16a34a" stroke-width="2"/>
+  <text x="190" y="598" text-anchor="middle" fill="#86efac" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">BusLocationService</text>
+  <text x="190" y="619" text-anchor="middle" fill="#86efac" font-size="11" opacity="0.75" font-family="Segoe UI,sans-serif">버스 위치 조회</text>
+
+  <!-- BusArrivalService -->
+  <rect x="640" y="568" width="220" height="68" rx="12" fill="#1a2e1a" stroke="#16a34a" stroke-width="2"/>
+  <text x="750" y="598" text-anchor="middle" fill="#86efac" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">BusArrivalService</text>
+  <text x="750" y="619" text-anchor="middle" fill="#86efac" font-size="11" opacity="0.75" font-family="Segoe UI,sans-serif">도착정보 조회</text>
+
+  <line x1="190" y1="488" x2="190" y2="566" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ag)"/>
+  <text x="197" y="532" fill="#16a34a" font-size="10" font-family="Segoe UI,sans-serif">routeId 전달</text>
+  <line x1="750" y1="488" x2="750" y2="566" stroke="#16a34a" stroke-width="1.5" marker-end="url(#ag)"/>
+  <text x="757" y="532" fill="#16a34a" font-size="10" font-family="Segoe UI,sans-serif">stationId 전달</text>
+
+  <!-- 경기도 공공데이터 API -->
+  <rect x="80" y="730" width="740" height="70" rx="12" fill="#1e1a2e" stroke="#6366f1" stroke-width="2"/>
+  <text x="450" y="761" text-anchor="middle" fill="#a5b4fc" font-size="14" font-weight="700" font-family="Segoe UI,sans-serif">경기도 공공데이터 API</text>
+  <text x="450" y="783" text-anchor="middle" fill="#a5b4fc" font-size="11" opacity="0.75" font-family="Segoe UI,sans-serif">apis.data.go.kr / 6410000</text>
+
+  <line x1="190" y1="638" x2="250" y2="728" stroke="#6366f1" stroke-width="1.5" marker-end="url(#ai)"/>
+  <line x1="750" y1="638" x2="650" y2="728" stroke="#6366f1" stroke-width="1.5" marker-end="url(#ai)"/>
+  <text x="210" y="694" fill="#6366f1" font-size="10" font-family="Segoe UI,sans-serif">버스 위치</text>
+  <text x="690" y="694" fill="#6366f1" font-size="10" font-family="Segoe UI,sans-serif">도착 시간</text>
+
+  <!-- AppConfig -->
+  <rect x="730" y="855" width="180" height="48" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="820" y="874" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="600" font-family="Segoe UI,sans-serif">AppConfig</text>
+  <text x="820" y="893" text-anchor="middle" fill="#64748b" font-size="10" font-family="Segoe UI,sans-serif">gyeonggiApiKey</text>
+  <line x1="770" y1="855" x2="700" y2="802" stroke="#334155" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#a)"/>
+
+  <!-- ===== 소셜 로그인 흐름 ===== -->
+  <!-- 사용자 -->
+  <rect x="1317" y="128" width="220" height="68" rx="12" fill="#1e3a5f" stroke="#2563eb" stroke-width="2"/>
+  <text x="1427" y="157" text-anchor="middle" fill="#93c5fd" font-size="14" font-weight="700" font-family="Segoe UI,sans-serif">사용자</text>
+  <text x="1427" y="178" text-anchor="middle" fill="#93c5fd" font-size="11" opacity="0.75" font-family="Segoe UI,sans-serif">소셜 로그인 선택</text>
+
+  <!-- 로그인 화면 -->
+  <rect x="1317" y="272" width="220" height="68" rx="12" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <text x="1427" y="301" text-anchor="middle" fill="#cbd5e1" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">로그인 화면</text>
+  <text x="1427" y="322" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Segoe UI,sans-serif">LoginScreen</text>
+
+  <line x1="1427" y1="198" x2="1427" y2="270" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <!-- KakaoAuth -->
+  <rect x="978" y="418" width="180" height="68" rx="12" fill="#2d1f00" stroke="#f59e0b" stroke-width="2"/>
+  <text x="1068" y="448" text-anchor="middle" fill="#fbbf24" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">KakaoAuth</text>
+  <text x="1068" y="469" text-anchor="middle" fill="#fbbf24" font-size="11" opacity="0.7" font-family="Segoe UI,sans-serif">Service</text>
+
+  <!-- GoogleAuth -->
+  <rect x="1337" y="418" width="180" height="68" rx="12" fill="#1a1f2e" stroke="#3b82f6" stroke-width="2"/>
+  <text x="1427" y="448" text-anchor="middle" fill="#93c5fd" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">GoogleAuth</text>
+  <text x="1427" y="469" text-anchor="middle" fill="#93c5fd" font-size="11" opacity="0.7" font-family="Segoe UI,sans-serif">Service</text>
+
+  <!-- NaverAuth -->
+  <rect x="1700" y="418" width="180" height="68" rx="12" fill="#0d2010" stroke="#22c55e" stroke-width="2"/>
+  <text x="1790" y="448" text-anchor="middle" fill="#86efac" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">NaverAuth</text>
+  <text x="1790" y="469" text-anchor="middle" fill="#86efac" font-size="11" opacity="0.7" font-family="Segoe UI,sans-serif">Service</text>
+
+  <!-- LoginScreen → 3 services -->
+  <line x1="1365" y1="342" x2="1118" y2="416" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="1427" y1="342" x2="1427" y2="416" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="1489" y1="342" x2="1740" y2="416" stroke="#22c55e" stroke-width="1.5" marker-end="url(#ap)"/>
+
+  <!-- Kakao SDK -->
+  <rect x="978" y="562" width="180" height="68" rx="12" fill="#2d1f3a" stroke="#7c3aed" stroke-width="2"/>
+  <text x="1068" y="592" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">Kakao SDK</text>
+  <text x="1068" y="613" text-anchor="middle" fill="#c4b5fd" font-size="10" opacity="0.7" font-family="Segoe UI,sans-serif">kakao_flutter_sdk</text>
+
+  <!-- Google SDK -->
+  <rect x="1337" y="562" width="180" height="68" rx="12" fill="#2d1f3a" stroke="#7c3aed" stroke-width="2"/>
+  <text x="1427" y="592" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">Google SDK</text>
+  <text x="1427" y="613" text-anchor="middle" fill="#c4b5fd" font-size="10" opacity="0.7" font-family="Segoe UI,sans-serif">google_sign_in</text>
+
+  <!-- Naver SDK -->
+  <rect x="1700" y="562" width="180" height="68" rx="12" fill="#2d1f3a" stroke="#7c3aed" stroke-width="2"/>
+  <text x="1790" y="592" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">Naver SDK</text>
+  <text x="1790" y="613" text-anchor="middle" fill="#c4b5fd" font-size="10" opacity="0.7" font-family="Segoe UI,sans-serif">flutter_naver_login</text>
+
+  <line x1="1068" y1="488" x2="1068" y2="560" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="1427" y1="488" x2="1427" y2="560" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="1790" y1="488" x2="1790" y2="560" stroke="#7c3aed" stroke-width="1.5" marker-end="url(#ap)"/>
+
+  <!-- Kakao OAuth -->
+  <rect x="978" y="710" width="180" height="68" rx="12" fill="#2d1a00" stroke="#f59e0b" stroke-width="2"/>
+  <text x="1068" y="740" text-anchor="middle" fill="#fbbf24" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">Kakao</text>
+  <text x="1068" y="761" text-anchor="middle" fill="#fbbf24" font-size="11" opacity="0.7" font-family="Segoe UI,sans-serif">OAuth 서버</text>
+
+  <!-- Google OAuth -->
+  <rect x="1337" y="710" width="180" height="68" rx="12" fill="#0d1a2e" stroke="#3b82f6" stroke-width="2"/>
+  <text x="1427" y="740" text-anchor="middle" fill="#93c5fd" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">Google</text>
+  <text x="1427" y="761" text-anchor="middle" fill="#93c5fd" font-size="11" opacity="0.7" font-family="Segoe UI,sans-serif">OAuth 서버</text>
+
+  <!-- Naver OAuth -->
+  <rect x="1700" y="710" width="180" height="68" rx="12" fill="#0a1a0a" stroke="#22c55e" stroke-width="2"/>
+  <text x="1790" y="740" text-anchor="middle" fill="#86efac" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">Naver</text>
+  <text x="1790" y="761" text-anchor="middle" fill="#86efac" font-size="11" opacity="0.7" font-family="Segoe UI,sans-serif">OAuth 서버</text>
+
+  <line x1="1068" y1="632" x2="1068" y2="708" stroke="#f59e0b" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="1427" y1="632" x2="1427" y2="708" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#ap)"/>
+  <line x1="1790" y1="632" x2="1790" y2="708" stroke="#22c55e" stroke-width="1.5" marker-end="url(#ap)"/>
+
+  <!-- LocalAuthRepository -->
+  <rect x="1287" y="880" width="280" height="68" rx="12" fill="#1e2a2a" stroke="#0891b2" stroke-width="2"/>
+  <text x="1427" y="910" text-anchor="middle" fill="#67e8f9" font-size="13" font-weight="700" font-family="Segoe UI,sans-serif">LocalAuthRepository</text>
+  <text x="1427" y="931" text-anchor="middle" fill="#67e8f9" font-size="11" opacity="0.7" font-family="Segoe UI,sans-serif">SharedPreferences</text>
+
+  <line x1="1068" y1="780" x2="1320" y2="878" stroke="#0891b2" stroke-width="1.5" marker-end="url(#ac)"/>
+  <line x1="1427" y1="780" x2="1427" y2="878" stroke="#0891b2" stroke-width="1.5" marker-end="url(#ac)"/>
+  <line x1="1790" y1="780" x2="1534" y2="878" stroke="#0891b2" stroke-width="1.5" marker-end="url(#ac)"/>
+  <text x="1427" y="868" text-anchor="middle" fill="#0891b2" font-size="11" font-family="Segoe UI,sans-serif">토큰 / 사용자 정보 저장</text>
+
+  <!-- 범례 -->
+  <rect x="80" y="870" width="14" height="14" rx="3" fill="#1a2e1a" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="102" y="882" fill="#86efac" font-size="11" font-family="Segoe UI,sans-serif">버스 서비스 레이어</text>
+  <rect x="248" y="870" width="14" height="14" rx="3" fill="#2d1f3a" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="270" y="882" fill="#c4b5fd" font-size="11" font-family="Segoe UI,sans-serif">소셜 SDK</text>
+  <rect x="360" y="870" width="14" height="14" rx="3" fill="#1e1a2e" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="382" y="882" fill="#a5b4fc" font-size="11" font-family="Segoe UI,sans-serif">외부 API</text>
+  <rect x="456" y="870" width="14" height="14" rx="3" fill="#1e2a2a" stroke="#0891b2" stroke-width="1.5"/>
+  <text x="478" y="882" fill="#67e8f9" font-size="11" font-family="Segoe UI,sans-serif">로컬 저장소</text>
+</svg>
+</body>
+</html>

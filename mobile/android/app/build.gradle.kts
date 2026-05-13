@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -5,10 +7,35 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val localProperties = Properties().apply {
+    val propertiesFile = rootProject.file("local.properties")
+    if (propertiesFile.exists()) {
+        propertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun quoted(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+val googleServicesFile = file("google-services.json")
+val googleServerClientId = localProperties.getProperty("google.serverClientId", "").trim()
+val naverClientId = localProperties.getProperty("naver.clientId", "")
+val naverClientSecret = localProperties.getProperty("naver.clientSecret", "")
+val naverClientName = localProperties.getProperty("naver.clientName", "BusETA")
+val googleConfigured = true
+val naverConfigured = naverClientId.isNotBlank() && naverClientSecret.isNotBlank()
+
+if (googleServicesFile.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.example.mobile"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
+
+    buildFeatures {
+        buildConfig = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -29,6 +56,13 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        buildConfigField("boolean", "GOOGLE_AUTH_CONFIGURED", googleConfigured.toString())
+        buildConfigField("String", "GOOGLE_SERVER_CLIENT_ID", quoted(googleServerClientId))
+        buildConfigField("boolean", "NAVER_AUTH_CONFIGURED", naverConfigured.toString())
+        resValue("string", "client_id", quoted(naverClientId))
+        resValue("string", "client_secret", quoted(naverClientSecret))
+        resValue("string", "client_name", quoted(naverClientName))
     }
 
     buildTypes {

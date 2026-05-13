@@ -1,5 +1,6 @@
+import 'dart:convert';
+
 import 'package:http/http.dart' as http;
-import 'package:xml/xml.dart';
 
 import '../config/app_config.dart';
 import '../models/bus_eta_models.dart';
@@ -16,6 +17,8 @@ class BusArrivalService {
       {
         'serviceKey': AppConfig.gyeonggiApiKey,
         'stationId': stationId,
+        'numOfRows': '30',
+        'pageNo': '1',
       },
     );
 
@@ -28,29 +31,24 @@ class BusArrivalService {
     return _parseArrivals(response.body);
   }
 
-  List<ArrivalInfo> _parseArrivals(String xml) {
-    final doc = XmlDocument.parse(xml);
-    final resultCode = doc.findAllElements('resultCode').firstOrNull?.innerText;
-    if (resultCode != null && resultCode != '0') {
-      return [];
-    }
+  List<ArrivalInfo> _parseArrivals(String body) {
+    final data = jsonDecode(body) as Map<String, dynamic>;
+    final resultCode = data['response']?['msgHeader']?['resultCode'];
+    if (resultCode != 0) return [];
 
-    final items = doc.findAllElements('busArrivalList');
+    final rawList = data['response']?['msgBody']?['busArrivalList'];
+    if (rawList == null) return [];
+    final items = rawList is List ? rawList : [rawList];
+
     final result = <ArrivalInfo>[];
-
     for (final el in items) {
-      final routeId = el.findElements('routeId').firstOrNull?.innerText ?? '';
-      final routeName = el.findElements('routeName').firstOrNull?.innerText ?? '';
-      final predictTime1 = int.tryParse(
-            el.findElements('predictTime1').firstOrNull?.innerText ?? '',
-          ) ??
-          -1;
-      final locationNo1 = int.tryParse(
-            el.findElements('locationNo1').firstOrNull?.innerText ?? '',
-          ) ??
-          0;
-      final stationName1 = el.findElements('stationName1').firstOrNull?.innerText ?? '';
-      final plateNo1 = el.findElements('plateNo1').firstOrNull?.innerText;
+      final map = el as Map<String, dynamic>;
+      final routeId = map['routeId']?.toString() ?? '';
+      final routeName = map['routeName']?.toString() ?? '';
+      final predictTime1 = int.tryParse(map['predictTime1']?.toString() ?? '') ?? -1;
+      final locationNo1 = int.tryParse(map['locationNo1']?.toString() ?? '') ?? 0;
+      final stationName1 = map['stationName1']?.toString() ?? '';
+      final plateNo1 = map['plateNo1']?.toString();
 
       if (routeName.isNotEmpty) {
         result.add(ArrivalInfo(
@@ -63,16 +61,9 @@ class BusArrivalService {
         ));
       }
 
-      // 두 번째 차량 (predictTime2) 도 별도 항목으로 추가
-      final predictTime2 = int.tryParse(
-            el.findElements('predictTime2').firstOrNull?.innerText ?? '',
-          ) ??
-          -1;
+      final predictTime2 = int.tryParse(map['predictTime2']?.toString() ?? '') ?? -1;
       if (predictTime2 > 0) {
-        final locationNo2 = int.tryParse(
-              el.findElements('locationNo2').firstOrNull?.innerText ?? '',
-            ) ??
-            0;
+        final locationNo2 = int.tryParse(map['locationNo2']?.toString() ?? '') ?? 0;
         result.add(ArrivalInfo(
           line: routeName,
           arrivalMinutes: predictTime2,

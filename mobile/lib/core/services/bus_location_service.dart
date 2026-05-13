@@ -1,5 +1,6 @@
+import 'dart:convert';
+
 import 'package:http/http.dart' as http;
-import 'package:xml/xml.dart';
 
 import '../config/app_config.dart';
 import '../models/bus_eta_models.dart';
@@ -16,6 +17,8 @@ class BusLocationService {
       {
         'serviceKey': AppConfig.gyeonggiApiKey,
         'routeId': routeId,
+        'numOfRows': '100',
+        'pageNo': '1',
       },
     );
 
@@ -57,40 +60,32 @@ class BusLocationService {
     return results.expand((list) => list).toList();
   }
 
-  List<BusLocation> _parseLocations(String xml, String routeId, String routeName) {
-    final doc = XmlDocument.parse(xml);
-    final resultCode = doc.findAllElements('resultCode').firstOrNull?.innerText;
-    if (resultCode != null && resultCode != '0') {
-      return [];
-    }
+  List<BusLocation> _parseLocations(String body, String routeId, String routeName) {
+    final data = jsonDecode(body) as Map<String, dynamic>;
+    final resultCode = data['response']?['msgHeader']?['resultCode'];
+    if (resultCode != 0) return [];
 
-    final items = doc.findAllElements('busLocationList');
-    return items
-        .map((el) {
-          final x = double.tryParse(el.findElements('x').firstOrNull?.innerText ?? '');
-          final y = double.tryParse(el.findElements('y').firstOrNull?.innerText ?? '');
-          if (x == null || y == null || x == 0 || y == 0) return null;
+    final rawList = data['response']?['msgBody']?['busLocationList'];
+    if (rawList == null) return [];
+    final items = rawList is List ? rawList : [rawList];
 
-          final stationSeq = int.tryParse(
-                el.findElements('stationSeq').firstOrNull?.innerText ?? '',
-              ) ??
-              0;
-          final plateNo = el.findElements('plateNo').firstOrNull?.innerText;
-          final remainSeat = int.tryParse(
-            el.findElements('remainSeatCnt').firstOrNull?.innerText ?? '',
-          );
-
-          return BusLocation(
-            routeId: routeId,
-            routeName: routeName,
-            latitude: y,
-            longitude: x,
-            stationSeq: stationSeq,
-            plateNo: plateNo,
-            remainSeatCnt: remainSeat,
-          );
-        })
-        .whereType<BusLocation>()
-        .toList();
+    return items.map((el) {
+      final map = el as Map<String, dynamic>;
+      final x = double.tryParse(map['x']?.toString() ?? '');
+      final y = double.tryParse(map['y']?.toString() ?? '');
+      if (x == null || y == null || x == 0 || y == 0) return null;
+      final stationSeq = int.tryParse(map['stationSeq']?.toString() ?? '') ?? 0;
+      final plateNo = map['plateNo']?.toString();
+      final remainSeat = int.tryParse(map['remainSeatCnt']?.toString() ?? '');
+      return BusLocation(
+        routeId: routeId,
+        routeName: routeName,
+        latitude: y,
+        longitude: x,
+        stationSeq: stationSeq,
+        plateNo: plateNo,
+        remainSeatCnt: remainSeat,
+      );
+    }).whereType<BusLocation>().toList();
   }
 }

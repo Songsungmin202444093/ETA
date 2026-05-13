@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../app/theme/app_theme.dart';
 import '../../auth/presentation/login_screen.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../auth/providers/auth_state.dart';
 import '../../onboarding/presentation/onboarding_screen.dart';
 import '../../shell/presentation/app_shell.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scale;
@@ -50,21 +53,27 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _controller.forward();
-    _navigate();
+    // 첫 프레임 이후 실행해야 provider 상태 변경이 빌드와 겹치지 않는다.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _navigate();
+    });
   }
 
   Future<void> _navigate() async {
-    // 최소 표시 시간과 초기화를 병렬로
+    // 최소 표시 시간과 세션 초기화를 병렬로
     final results = await Future.wait([
       SharedPreferences.getInstance(),
+      ref.read(authProvider.notifier).initialize(),
       Future<void>.delayed(const Duration(milliseconds: 1800)),
     ]);
 
     if (!mounted) return;
 
     final prefs = results[0] as SharedPreferences;
-    final isLoggedIn = prefs.getBool('auto_login') ?? false;
     final onboardingDone = prefs.getBool('onboarding_done') ?? false;
+    final isLoggedIn =
+        ref.read(authProvider) is AuthAuthenticated;
 
     Widget next;
     if (!onboardingDone) {
@@ -77,8 +86,8 @@ class _SplashScreenState extends State<SplashScreen>
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => next,
-        transitionsBuilder: (_, animation, __, child) =>
+        pageBuilder: (_, animation, secondaryAnimation) => next,
+        transitionsBuilder: (_, animation, secondaryAnimation, child) =>
             FadeTransition(opacity: animation, child: child),
         transitionDuration: const Duration(milliseconds: 400),
       ),
@@ -98,7 +107,7 @@ class _SplashScreenState extends State<SplashScreen>
       body: Center(
         child: AnimatedBuilder(
           animation: _controller,
-          builder: (_, __) => Column(
+          builder: (context, child) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // 버스 아이콘
